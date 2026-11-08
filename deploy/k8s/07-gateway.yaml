@@ -1,0 +1,77 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+# gateway (8080) - JWT login, routing/proxy, platform aggregation. Exposed via NodePort 30080.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: tenancy-center
+  labels: { app: gateway }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: gateway }
+  template:
+    metadata:
+      labels: { app: gateway }
+    spec:
+      containers:
+        - name: gateway
+          image: tenancy/gateway:1.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TENANT_SERVICE_URL
+              value: http://tenant-service:8081
+            - name: APPROVAL_SERVICE_URL
+              value: http://approval-service:8082
+            - name: AGENT_SERVICE_URL
+              value: http://agent-service:8083
+            - name: MCP_SERVICE_URL
+              value: http://mcp-service:8084
+            - name: TENANCY_SECURITY_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: TENANCY_SECURITY_JWT_SECRET } }
+            - name: TENANCY_SECURITY_INTERNAL_TOKEN
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: TENANCY_INTERNAL_TOKEN } }
+            - name: TENANCY_SECURITY_API_KEYS
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: TENANCY_SECURITY_API_KEYS } }
+            - name: TZ
+              value: Asia/Shanghai
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 45
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: tenancy-center
+spec:
+  type: NodePort
+  selector: { app: gateway }
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080

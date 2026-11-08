@@ -1,0 +1,15 @@
+{
+  "tenantId": "t-demo-low",
+  "tenantCode": "demo-low",
+  "plan": "PRO",
+  "region": "cn-shanghai",
+  "quotaSeats": 20,
+  "quotaStorageGb": 50,
+  "quotaApiRpm": 600,
+  "riskLevel": "LOW",
+  "riskScore": 10,
+  "contactEmail": "ops@startup.com",
+  "attributes": { "industry": "software" },
+  "orgUnitCount": 3,
+  "accountCount": 12
+}

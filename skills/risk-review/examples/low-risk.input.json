@@ -1,0 +1,8 @@
+{
+  "tenantCode": "acme",
+  "plan": "PRO",
+  "region": "cn-shanghai",
+  "quotaSeats": 50,
+  "contactEmail": "ops@acme.com",
+  "attributes": {"industry": "software"}
+}

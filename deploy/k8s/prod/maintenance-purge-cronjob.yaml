@@ -1,0 +1,56 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+# Daily data-lifecycle purge (tenant-service v5 retention job).
+# The in-process @Scheduled retention job is kept enabled by default; this CronJob is
+# the multi-replica-safe trigger used by the production profile (deploy/k8s/prod/apply-prod.sh).
+#
+# Schedule expressed in UTC: 04:00 UTC == 12:00 Asia/Shanghai.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: maintenance-purge
+  namespace: tenancy-center
+spec:
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: maintenance-purge
+              image: curlimages/curl:8.10.1
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: INTERNAL_TOKEN
+                  valueFrom:
+                    secretKeyRef: { name: tenancy-secrets, key: TENANCY_INTERNAL_TOKEN }
+              command:
+                - sh
+                - -c
+                - |
+                  curl -fsS -X POST \
+                    -H "X-Internal-Token: ${INTERNAL_TOKEN}" \
+                    http://tenant-service:8081/internal/maintenance/purge
+              resources:
+                requests: { cpu: 20m, memory: 32Mi }
+                limits: { cpu: 200m, memory: 64Mi }

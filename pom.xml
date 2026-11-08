@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.5</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.suhong.jiuding</groupId>
+  <artifactId>jiuding</artifactId>
+  <version>0.9.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>jiuding</name>
+  <description>Jiuding - Multi-Tenant Intelligence Hub: agentic, microservice, skill-driven, MCP-enabled</description>
+
+  <modules>
+    <module>agent-kernel</module>
+    <module>tenancy-common</module>
+    <module>tenant-service</module>
+    <module>approval-service</module>
+    <module>agent-service</module>
+    <module>mcp-service</module>
+    <module>gateway</module>
+    <module>tenancy-cli</module>
+  </modules>
+
+  <properties>
+    <java.version>17</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>17</maven.compiler.release>
+    <picocli.version>4.7.6</picocli.version>
+    <jiuding.version>0.9.0-SNAPSHOT</jiuding.version>
+    <skipITs>false</skipITs>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.suhong.jiuding</groupId>
+        <artifactId>agent-kernel</artifactId>
+        <version>${jiuding.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.suhong.jiuding</groupId>
+        <artifactId>tenancy-common</artifactId>
+        <version>${jiuding.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>${picocli.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.2.5</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>3.2.5</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.4.1</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

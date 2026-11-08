@@ -1,0 +1,128 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: tenant-service
+  profiles:
+    default: dev
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+tenancy:
+  security:
+    # MCP / machine-to-machine API keys accepted on X-API-Key (CSV, comma separated).
+    api-keys: ${TENANCY_SECURITY_API_KEYS:dev-mcp-key}
+    # Shared token for service-to-service calls under /internal/** (never whitelisted).
+    internal-token: ${TENANCY_INTERNAL_TOKEN:dev-internal-token}
+    # Public self-service onboarding endpoints must stay unauthenticated.
+    whitelist:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /api/auth/login
+      - /api/public/**
+      # v6 SCIM 2.0 endpoints authenticate with a tenant-scoped SCIM bearer token
+      # inside tenant-service (docs/16 §7), so the shared JWT filter must not pre-reject them.
+      - /scim/v2/**
+      - /error
+  # Self-service tenant onboarding (docs/15 section 6).
+  onboarding:
+    rate-limit-per-minute: ${TENANCY_ONBOARDING_RATE_LIMIT:5}
+    default-plan: ${TENANCY_ONBOARDING_DEFAULT_PLAN:PRO}
+    default-region: ${TENANCY_ONBOARDING_DEFAULT_REGION:cn-shanghai}
+  # Data lifecycle / retention (docs/15 section 8).
+  retention:
+    auto-purge-enabled: ${TENANCY_RETENTION_AUTO_PURGE:true}
+    purge-cron: "${TENANCY_RETENTION_PURGE_CRON:0 0 4 * * *}"
+    login-event-days: ${TENANCY_RETENTION_LOGIN_EVENT_DAYS:90}
+    audit-days: ${TENANCY_RETENTION_AUDIT_DAYS:365}
+    collect-job-days: ${TENANCY_RETENTION_COLLECT_JOB_DAYS:90}
+    soft-deleted-tenant-days: ${TENANCY_RETENTION_SOFT_DELETED_TENANT_DAYS:180}
+  # Hard cap for page size on list endpoints.
+  max-page-size: 100
+  # Skill-driven risk review executed through agent-service before approval creation.
+  risk-review:
+    enabled: ${TENANCY_RISK_REVIEW_ENABLED:true}
+  # Five-dimension rating assessment: local weighted score plus an optional skill adjustment.
+  rating:
+    enabled: ${TENANCY_RATING_ENABLED:true}
+    timeout-ms: ${TENANCY_RATING_TIMEOUT_MS:2000}
+    # Daily scheduled refresh of ACTIVE tenants (docs/13 section 4).
+    auto-refresh-enabled: ${TENANCY_RATING_AUTO_REFRESH_ENABLED:true}
+    refresh-cron: "${TENANCY_RATING_REFRESH_CRON:0 0 3 * * *}"
+    refresh-limit: ${TENANCY_RATING_REFRESH_LIMIT:200}
+  agent-service:
+    url: ${AGENT_SERVICE_URL:http://localhost:8083}
+    connect-timeout-ms: 1500
+    read-timeout-ms: 3000
+    api-key: ${TENANCY_AGENT_API_KEY:dev-mcp-key}
+  approval-service:
+    url: ${APPROVAL_SERVICE_URL:http://localhost:8082}
+    connect-timeout-ms: 2000
+    read-timeout-ms: 5000
+    # Fallback credential for machine (non-JWT) callers when creating approvals.
+    api-key: ${TENANCY_APPROVAL_API_KEY:dev-mcp-key}
+  collect:
+    csv-max-bytes: 5242880
+    max-errors: 20
+    # true makes collection synchronous (used by tests); false = async thread pool.
+    sync: false
+    thread-pool-size: 4
+    queue-capacity: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.suhong.jiuding.tenant: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:file:./data/tenant;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${TENANT_DB_URL:jdbc:postgresql://postgres:5432/tenant_db}
+    username: ${TENANT_DB_USER:tenancy}
+    password: ${TENANT_DB_PASSWORD:tenancy}
+    driver-class-name: org.postgresql.Driver

@@ -1,0 +1,53 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+# Daily tenant-rating refresh. Replaces the in-process @Scheduled job when the
+# tenant-service runs with TENANCY_RATING_AUTO_REFRESH_ENABLED=false (multi-replica safe).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rating-refresh
+  namespace: tenancy-center
+spec:
+  # 03:00 Asia/Shanghai == 19:00 UTC. timeZone is omitted because some minimal
+  # k3s/apiserver images ship without tzdata ("unknown time zone Asia/Shanghai").
+  schedule: "0 19 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: rating-refresh
+              image: curlimages/curl:8.10.1
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: INTERNAL_TOKEN
+                  valueFrom:
+                    secretKeyRef: { name: tenancy-secrets, key: TENANCY_INTERNAL_TOKEN }
+              command:
+                - sh
+                - -c
+                - |
+                  curl -fsS -X POST \
+                    -H "X-Internal-Token: ${INTERNAL_TOKEN}" \
+                    http://tenant-service:8081/internal/ratings/refresh
+              resources:
+                requests: { cpu: 20m, memory: 32Mi }
+                limits: { cpu: 200m, memory: 64Mi }

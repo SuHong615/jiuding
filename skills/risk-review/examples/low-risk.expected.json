@@ -1,0 +1,8 @@
+{
+  "skillId": "risk-review",
+  "verdict": "PASS",
+  "score": -5,
+  "decision": "AUTO_APPROVE",
+  "riskLevel": "LOW",
+  "findings": []
+}

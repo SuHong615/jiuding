@@ -1,0 +1,5 @@
+{
+  "expectedAdjustment": 11,
+  "expectedFindings": ["R-RATE-004", "R-RATE-012", "R-RATE-014"],
+  "note": "PRO +4、席位 >=100 不命中、账号 >=10 +2、组织 >=2 +1；其余规则不命中"
+}

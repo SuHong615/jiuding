@@ -1,0 +1,17 @@
+{
+  "skillId": "approval-policy",
+  "verdict": "FAIL",
+  "score": 115,
+  "decision": "REJECT",
+  "actions": [
+    {"action": "requireRole", "value": "L2"},
+    {"action": "setSlaHours", "value": 12},
+    {"action": "addTag", "value": "enterprise"},
+    {"action": "requireRole", "value": "L2"},
+    {"action": "setSlaHours", "value": 8},
+    {"action": "setDecision", "value": "NEEDS_REVIEW"},
+    {"action": "addFinding", "message": "高风险租户需要 L2 会签", "severity": "HIGH"},
+    {"action": "setDecision", "value": "REJECT"},
+    {"action": "addFinding", "message": "riskScore >= 80，自动驳回", "severity": "HIGH"}
+  ]
+}

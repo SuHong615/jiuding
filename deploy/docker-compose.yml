@@ -1,0 +1,254 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+name: tenancy-center
+
+# 婢舵氨顫ら幋铚傝厬韫囧啩绔撮柨顕€鍎寸純灞傗偓鍌涚€杞扮瑐娑撳鏋冪紒鐔剁娑撹桨绮ㄦ惔鎾寸壌閻╊喖缍嶉敍?.閿涘绱?# 娴犮儰绌堕崥鍕箛閸斺€插▏閻劌鎮撴稉鈧禒?parent pom 娑?tenancy-common 濡€虫健閵?# 娴ｈ法鏁ら敍姝瀘cker compose --env-file .env up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tenancy-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tenancy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      POSTGRES_DB: postgres
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
+  tenant-service:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/tenant-service.Dockerfile
+    image: tenancy/tenant-service:1.0.0
+    container_name: tenancy-tenant-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      TENANT_DB_URL: jdbc:postgresql://postgres:5432/tenant_db
+      TENANT_DB_USER: ${POSTGRES_USER:-tenancy}
+      TENANT_DB_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tenant_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-tenancy}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      APPROVAL_SERVICE_URL: http://approval-service:8082
+      TENANCY_APPROVAL_URL: http://approval-service:8082
+      AGENT_SERVICE_URL: http://agent-service:8083
+      TENANCY_SECURITY_JWT_SECRET: ${TENANCY_JWT_SECRET:-tenancy-center-dev-secret-change-me-please}
+      TENANCY_SECURITY_INTERNAL_TOKEN: ${TENANCY_INTERNAL_TOKEN:-dev-internal-token}
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
+  approval-service:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/approval-service.Dockerfile
+    image: tenancy/approval-service:1.0.0
+    container_name: tenancy-approval-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      APPROVAL_DB_URL: jdbc:postgresql://postgres:5432/approval_db
+      APPROVAL_DB_USER: ${POSTGRES_USER:-tenancy}
+      APPROVAL_DB_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/approval_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-tenancy}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      TENANT_SERVICE_URL: http://tenant-service:8081
+      AGENT_SERVICE_URL: http://agent-service:8083
+      TENANCY_AGENT_URL: http://agent-service:8083
+      TENANCY_SECURITY_JWT_SECRET: ${TENANCY_JWT_SECRET:-tenancy-center-dev-secret-change-me-please}
+      TENANCY_SECURITY_INTERNAL_TOKEN: ${TENANCY_INTERNAL_TOKEN:-dev-internal-token}
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tenant-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
+  agent-service:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/agent-service.Dockerfile
+    image: tenancy/agent-service:1.0.0
+    container_name: tenancy-agent-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AGENT_DB_URL: jdbc:postgresql://postgres:5432/agent_db
+      AGENT_DB_USER: ${POSTGRES_USER:-tenancy}
+      AGENT_DB_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agent_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-tenancy}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      TENANT_SERVICE_URL: http://tenant-service:8081
+      APPROVAL_SERVICE_URL: http://approval-service:8082
+      TENANCY_SKILLS_DIR: /app/skills
+      TENANCY_AGENT_MODEL_PROVIDER: ${TENANCY_AGENT_MODEL_PROVIDER:-scripted}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      TENANCY_SECURITY_JWT_SECRET: ${TENANCY_JWT_SECRET:-tenancy-center-dev-secret-change-me-please}
+      TENANCY_SECURITY_INTERNAL_TOKEN: ${TENANCY_INTERNAL_TOKEN:-dev-internal-token}
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tenant-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
+  mcp-service:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/mcp-service.Dockerfile
+    image: tenancy/mcp-service:1.0.0
+    container_name: tenancy-mcp-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      TENANT_SERVICE_URL: http://tenant-service:8081
+      APPROVAL_SERVICE_URL: http://approval-service:8082
+      AGENT_SERVICE_URL: http://agent-service:8083
+      TENANCY_TENANT_URL: http://tenant-service:8081
+      TENANCY_APPROVAL_URL: http://approval-service:8082
+      TENANCY_AGENT_URL: http://agent-service:8083
+      # v5: mcp-service owns mcp_db (per-user API keys / call audits / external servers)
+      MCP_DB_URL: jdbc:postgresql://postgres:5432/mcp_db
+      MCP_DB_USER: ${POSTGRES_USER:-tenancy}
+      MCP_DB_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mcp_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-tenancy}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
+      TENANCY_SECURITY_API_KEYS: ${TENANCY_MCP_API_KEY:-dev-mcp-key}
+      TENANCY_SECURITY_JWT_SECRET: ${TENANCY_JWT_SECRET:-tenancy-center-dev-secret-change-me-please}
+      TENANCY_SECURITY_INTERNAL_TOKEN: ${TENANCY_INTERNAL_TOKEN:-dev-internal-token}
+      TZ: Asia/Shanghai
+    depends_on:
+      tenant-service:
+        condition: service_healthy
+      approval-service:
+        condition: service_healthy
+      agent-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/gateway.Dockerfile
+    image: tenancy/gateway:1.0.0
+    container_name: tenancy-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      TENANT_SERVICE_URL: http://tenant-service:8081
+      APPROVAL_SERVICE_URL: http://approval-service:8082
+      AGENT_SERVICE_URL: http://agent-service:8083
+      MCP_SERVICE_URL: http://mcp-service:8084
+      TENANCY_SECURITY_JWT_SECRET: ${TENANCY_JWT_SECRET:-tenancy-center-dev-secret-change-me-please}
+      TENANCY_SECURITY_INTERNAL_TOKEN: ${TENANCY_INTERNAL_TOKEN:-dev-internal-token}
+      TENANCY_SECURITY_API_KEYS: ${TENANCY_MCP_API_KEY:-dev-mcp-key}
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"
+    depends_on:
+      tenant-service:
+        condition: service_healthy
+      approval-service:
+        condition: service_healthy
+      agent-service:
+        condition: service_healthy
+      mcp-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/frontend.Dockerfile
+    image: tenancy/frontend:1.0.0
+    container_name: tenancy-frontend
+    ports:
+      - "8088:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
+networks:
+  tenancy-net:
+    driver: bridge
+
+volumes:
+  postgres-data:

@@ -1,0 +1,76 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+server:
+  port: ${SERVER_PORT:8084}
+  shutdown: graceful
+
+spring:
+  application:
+    name: mcp-service
+  jackson:
+    default-property-inclusion: non_null
+  # v5 mcp_db: per-user API keys, MCP call audits, external MCP servers.
+  # Local dev = H2 file database; docker/k8s override with MCP_DB_URL / MCP_DB_USER / MCP_DB_PASSWORD.
+  datasource:
+    url: ${MCP_DB_URL:jdbc:h2:file:./data/mcp;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE}
+    username: ${MCP_DB_USER:sa}
+    password: ${MCP_DB_PASSWORD:}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+tenancy:
+  security:
+    jwt-secret: ${TENANCY_SECURITY_JWT_SECRET:${TENANCY_JWT_SECRET:tenancy-center-dev-secret-change-me-please}}
+    internal-token: ${TENANCY_INTERNAL_TOKEN:dev-internal-token}
+    # Machine credential accepted on /mcp (X-API-Key). Comma separated list.
+    # v5: personal DB keys (tk_...) are additionally validated against mcp_api_keys.
+    api-keys: ${TENANCY_SECURITY_API_KEYS:dev-mcp-key}
+    whitelist:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /error
+  mcp:
+    server-name: tenancy-mcp
+    server-version: 1.0.0
+    protocol-version: 2025-06-18
+    tenant-service-url: ${TENANT_SERVICE_URL:${TENANCY_TENANT_URL:http://localhost:8081}}
+    approval-service-url: ${APPROVAL_SERVICE_URL:${TENANCY_APPROVAL_URL:http://localhost:8082}}
+    agent-service-url: ${AGENT_SERVICE_URL:${TENANCY_AGENT_URL:http://localhost:8083}}
+    # Key used for downstream service-to-service calls when the caller used JWT,
+    # or did not supply X-API-Key (matches every service's default api-keys list).
+    downstream-api-key: ${MCP_DOWNSTREAM_API_KEY:dev-mcp-key}
+    tool-timeout-ms: ${TENANCY_MCP_TOOL_TIMEOUT_MS:10000}
+    skill-timeout-ms: ${TENANCY_MCP_SKILL_TIMEOUT_MS:30000}
+    sse-heartbeat-ms: ${TENANCY_MCP_SSE_HEARTBEAT_MS:15000}
+    sse-timeout-ms: ${TENANCY_MCP_SSE_TIMEOUT_MS:3600000}
+    # Public MCP endpoint advertised by GET /api/mcp/config (through the gateway).
+    public-endpoint: ${MCP_PUBLIC_ENDPOINT:/mcp}
+    docs-url: ${MCP_DOCS_URL:docs/05-mcp-spec.md}
+    # Outbound timeout for external MCP server connectivity checks.
+    external-check-timeout-ms: ${TENANCY_MCP_EXTERNAL_CHECK_TIMEOUT_MS:5000}
+
+logging:
+  level:
+    com.suhong.jiuding.mcp: INFO

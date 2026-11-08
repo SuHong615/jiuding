@@ -1,0 +1,121 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+skillId: tenant-rating
+version: 1.0.0
+initialScore: 0
+rules:
+  - id: R-RATE-001
+    description: ENTERPRISE 规模加分
+    severity: MEDIUM
+    when: { field: plan, op: eq, value: ENTERPRISE }
+    then:
+      - { action: addScore, value: 10 }
+      - { action: addFinding, message: 企业版租户，业务规模评级加分, severity: MEDIUM }
+  - id: R-RATE-002
+    description: PRO 规模加分
+    severity: LOW
+    when: { field: plan, op: eq, value: PRO }
+    then:
+      - { action: addScore, value: 4 }
+  - id: R-RATE-003
+    description: 超大配额（>=500 席位）
+    severity: MEDIUM
+    when: { field: quotaSeats, op: gte, value: 500 }
+    then:
+      - { action: addScore, value: 6 }
+      - { action: addFinding, message: 席位 >= 500，业务体量显著, severity: MEDIUM }
+  - id: R-RATE-004
+    description: 中大配额（>=100 席位）
+    severity: LOW
+    when: { field: quotaSeats, op: gte, value: 100 }
+    then:
+      - { action: addScore, value: 3 }
+  - id: R-RATE-005
+    description: 高风险等级扣分
+    severity: HIGH
+    when: { field: riskLevel, op: eq, value: HIGH }
+    then:
+      - { action: addScore, value: -18 }
+      - { action: addFinding, message: 风险等级 HIGH，合规维度显著扣分, severity: HIGH }
+  - id: R-RATE-006
+    description: 中风险等级扣分
+    severity: MEDIUM
+    when: { field: riskLevel, op: eq, value: MEDIUM }
+    then:
+      - { action: addScore, value: -8 }
+  - id: R-RATE-007
+    description: 风险分过高
+    severity: HIGH
+    when: { field: riskScore, op: gte, value: 80 }
+    then:
+      - { action: addScore, value: -12 }
+      - { action: addFinding, message: 风险分 >= 80，需降级复核, severity: HIGH }
+  - id: R-RATE-008
+    description: 受制裁/高风险区域
+    severity: HIGH
+    when: { field: region, op: in, value: [iran, north-korea, crimea, sanctioned] }
+    then:
+      - { action: addScore, value: -25 }
+      - { action: addFinding, message: 位于受制裁或高风险区域, severity: HIGH }
+  - id: R-RATE-009
+    description: 高风险行业
+    severity: HIGH
+    when: { field: attributes.industry, op: in, value: [gambling, crypto-exchange, adult] }
+    then:
+      - { action: addScore, value: -12 }
+      - { action: addFinding, message: 高风险行业，合规维度扣分, severity: HIGH }
+  - id: R-RATE-010
+    description: 黑名单命中
+    severity: HIGH
+    when: { field: attributes.blacklist, op: eq, value: true }
+    then:
+      - { action: addScore, value: -40 }
+      - { action: addFinding, message: 命中黑名单，评级直接降档, severity: HIGH }
+  - id: R-RATE-011
+    description: 组织成熟度高（账号 >= 50）
+    severity: LOW
+    when: { field: accountCount, op: gte, value: 50 }
+    then:
+      - { action: addScore, value: 5 }
+      - { action: addFinding, message: 账号规模 >= 50，组织成熟度加分, severity: LOW }
+  - id: R-RATE-012
+    description: 已有账号体系（>= 10）
+    severity: LOW
+    when: { field: accountCount, op: gte, value: 10 }
+    then:
+      - { action: addScore, value: 2 }
+  - id: R-RATE-013
+    description: 组织层级完整（>= 5）
+    severity: LOW
+    when: { field: orgUnitCount, op: gte, value: 5 }
+    then:
+      - { action: addScore, value: 4 }
+      - { action: addFinding, message: 组织层级 >= 5，治理成熟度加分, severity: LOW }
+  - id: R-RATE-014
+    description: 已建立组织（>= 2）
+    severity: LOW
+    when: { field: orgUnitCount, op: gte, value: 2 }
+    then:
+      - { action: addScore, value: 1 }
+  - id: R-RATE-015
+    description: 联系人邮箱缺失
+    severity: LOW
+    when: { field: contactEmail, op: empty }
+    then:
+      - { action: addScore, value: -6 }
+      - { action: addFinding, message: 缺少联系人邮箱，安全维度扣分, severity: LOW }
+decision:
+  emit: false

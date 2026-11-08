@@ -1,0 +1,93 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+# agent-service (8083) - AgentScope runtime + deterministic skill rule engine.
+# Skills are baked into the image at /app/skills (Dockerfile COPY skills).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-service
+  namespace: tenancy-center
+  labels: { app: agent-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: agent-service }
+  template:
+    metadata:
+      labels: { app: agent-service }
+    spec:
+      containers:
+        - name: agent-service
+          image: tenancy/agent-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: AGENT_DB_URL
+              value: jdbc:postgresql://postgres:5432/agent_db
+            - name: AGENT_DB_USER
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: POSTGRES_USER } }
+            - name: AGENT_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: POSTGRES_PASSWORD } }
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/agent_db
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: POSTGRES_USER } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: POSTGRES_PASSWORD } }
+            - name: TENANT_SERVICE_URL
+              value: http://tenant-service:8081
+            - name: APPROVAL_SERVICE_URL
+              value: http://approval-service:8082
+            - name: TENANCY_SKILLS_DIR
+              value: /app/skills
+            - name: TENANCY_AGENT_MODEL_PROVIDER
+              value: scripted
+            - name: TENANCY_SECURITY_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: TENANCY_SECURITY_JWT_SECRET } }
+            - name: TENANCY_SECURITY_INTERNAL_TOKEN
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: TENANCY_INTERNAL_TOKEN } }
+            - name: TENANCY_SECURITY_API_KEYS
+              valueFrom: { secretKeyRef: { name: tenancy-secrets, key: TENANCY_SECURITY_API_KEYS } }
+            - name: TZ
+              value: Asia/Shanghai
+          ports:
+            - containerPort: 8083
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8083 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 8083 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 200m, memory: 384Mi }
+            limits: { cpu: "1", memory: 896Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-service
+  namespace: tenancy-center
+spec:
+  type: NodePort
+  selector: { app: agent-service }
+  ports:
+    - port: 8083
+      targetPort: 8083
+      nodePort: 30083

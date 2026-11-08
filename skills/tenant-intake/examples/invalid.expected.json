@@ -1,0 +1,13 @@
+{
+  "skillId": "tenant-intake",
+  "verdict": "FAIL",
+  "score": 105,
+  "decision": "REJECT",
+  "findings": [
+    {"ruleId": "R-INTAKE-001", "severity": "HIGH", "message": "缺少必填字段 tenantCode 或 name"},
+    {"ruleId": "R-INTAKE-003", "severity": "MEDIUM", "message": "邮箱格式不合法"},
+    {"ruleId": "R-INTAKE-004", "severity": "LOW", "message": "plan 使用别名，已按规范归一化"},
+    {"ruleId": "R-INTAKE-005", "severity": "LOW", "message": "region 使用别名，已归一化为标准区域码"},
+    {"ruleId": "R-INTAKE-006", "severity": "MEDIUM", "message": "疑似重复租户，需要人工确认租户编码唯一性"}
+  ]
+}

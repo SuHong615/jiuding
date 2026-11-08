@@ -1,0 +1,57 @@
+name: Bug report
+description: 报告一个可复现的问题
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请先确认问题在 `main` 最新代码可复现，并已排除本地环境问题。
+        安全漏洞请勿在此公开，按 SECURITY.md 私密报告。
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 提交
+      description: 例如 v0.9.0 或 commit sha
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: 影响模块
+      options:
+        - tenant-service
+        - approval-service
+        - agent-service
+        - mcp-service
+        - gateway
+        - frontend
+        - CLI
+        - deploy/k8s
+        - docs
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. ...
+        2. ...
+        期望：...
+        实际：...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 请脱敏（勿粘贴密钥、token、真实租户数据）
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 自查
+      options:
+        - label: 已确认不是默认演示数据/密钥导致
+        - label: 已在最新 main 上复现

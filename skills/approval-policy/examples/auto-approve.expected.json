@@ -1,0 +1,12 @@
+{
+  "skillId": "approval-policy",
+  "verdict": "PASS",
+  "score": 0,
+  "decision": "AUTO_APPROVE",
+  "actions": [
+    {"action": "setDecision", "value": "AUTO_APPROVE"},
+    {"action": "requireRole", "value": "SYSTEM"},
+    {"action": "setSlaHours", "value": 4},
+    {"action": "addTag", "value": "auto-approve"}
+  ]
+}

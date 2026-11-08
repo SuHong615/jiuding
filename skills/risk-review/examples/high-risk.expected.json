@@ -1,0 +1,13 @@
+{
+  "skillId": "risk-review",
+  "verdict": "FAIL",
+  "score": 125,
+  "decision": "REJECT",
+  "riskLevel": "HIGH",
+  "findings": [
+    {"ruleId": "R-RISK-001", "severity": "HIGH", "message": "高风险行业叠加超大配额，需人工复核"},
+    {"ruleId": "R-RISK-002", "severity": "HIGH", "message": "高风险行业，需合规复核"},
+    {"ruleId": "R-RISK-004", "severity": "MEDIUM", "message": "配额超过 100 席位，需容量评审"},
+    {"ruleId": "R-RISK-005", "severity": "HIGH", "message": "使用临时邮箱域名，联系人真实性存疑"}
+  ]
+}

@@ -1,0 +1,23 @@
+九鼎 · 多租户智能中枢（Jiuding · Multi-Tenant Intelligence Hub）
+Copyright 2026 suhong
+
+本产品以 Apache License, Version 2.0 发布（见 LICENSE 文件）。
+
+本产品使用了以下开源软件/组件（其各自许可证见 THIRD_PARTY_LICENSES.md）：
+- AgentScope Java Runtime（Apache License 2.0）
+- Spring Boot / Spring Framework（Apache License 2.0）
+- Flyway（Apache License 2.0）
+- PostgreSQL JDBC Driver（BSD 2-Clause）
+- H2 Database（MPL 2.0 / EPL 1.0 双许可，按 MPL 2.0 使用）
+- Jackson（Apache License 2.0）
+- picocli（Apache License 2.0）
+- React / React DOM（MIT）
+- Vite（MIT）
+- TypeScript（Apache License 2.0）
+- PostgreSQL（PostgreSQL License）
+- nginx（BSD 2-Clause）
+- Eclipse Temurin（GPLv2 with Classpath Exception）
+- curl（curl License / MIT-like）
+
+第三方组件的版权与许可归其各自作者所有；本产品仅在其许可条款允许范围内使用。
+如对第三方许可有疑问，请联系：suhong（GitHub: @suhong）。

@@ -1,0 +1,10 @@
+{
+  "skillId": "provisioning",
+  "verdict": "PASS",
+  "score": 0,
+  "decision": "NONE",
+  "namespace": "ns-bigco",
+  "schema": "tenant_bigco",
+  "quotas": {"seats": 500, "storageGb": 2048, "apiRpm": 6000},
+  "tags": ["tier:enterprise", "isolation:dedicated-schema", "region:resolved"]
+}

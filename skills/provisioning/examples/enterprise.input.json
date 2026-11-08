@@ -1,0 +1,8 @@
+{
+  "tenantId": "t-bigco",
+  "tenantCode": "bigco",
+  "plan": "ENTERPRISE",
+  "region": "cn-shanghai",
+  "isolationMode": "DEDICATED_SCHEMA",
+  "riskLevel": "MEDIUM"
+}

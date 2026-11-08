@@ -1,0 +1,108 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+skillId: risk-review
+version: 1.0.0
+initialScore: 0
+rules:
+  - id: R-RISK-001
+    description: 高风险行业 + 大配额组合
+    severity: HIGH
+    when:
+      all:
+        - { field: attributes.industry, op: in, value: [gambling, crypto-exchange, adult] }
+        - { field: quotaSeats, op: gt, value: 100 }
+    then:
+      - { action: addScore, value: 45 }
+      - { action: addFinding, message: 高风险行业叠加超大配额，需人工复核, severity: HIGH }
+  - id: R-RISK-002
+    description: 高风险行业（无配额条件）
+    severity: HIGH
+    when: { field: attributes.industry, op: in, value: [gambling, crypto-exchange, adult] }
+    then:
+      - { action: addScore, value: 30 }
+      - { action: addFinding, message: 高风险行业，需合规复核, severity: HIGH }
+  - id: R-RISK-003
+    description: 受制裁或高风险区域
+    severity: HIGH
+    when: { field: region, op: in, value: [iran, north-korea, crimea, sanctioned] }
+    then:
+      - { action: addScore, value: 40 }
+      - { action: addFinding, message: 租户位于受制裁/高风险区域, severity: HIGH }
+  - id: R-RISK-004
+    description: 超大配额
+    severity: MEDIUM
+    when: { field: quotaSeats, op: gt, value: 100 }
+    then:
+      - { action: addScore, value: 25 }
+      - { action: addFinding, message: 配额超过 100 席位，需容量评审, severity: MEDIUM }
+  - id: R-RISK-005
+    description: 临时邮箱域名
+    severity: HIGH
+    when:
+      all:
+        - { field: contactEmail, op: exists }
+        - { field: contactEmail, op: matches, value: ".*@(mailinator|tempmail|10minutemail)\\..*" }
+    then:
+      - { action: addScore, value: 30 }
+      - { action: addFinding, message: 使用临时邮箱域名，联系人真实性存疑, severity: HIGH }
+  - id: R-RISK-006
+    description: 租户明确命中黑名单
+    severity: HIGH
+    when: { field: attributes.blacklist, op: eq, value: true }
+    then:
+      - { action: addScore, value: 60 }
+      - { action: addFinding, message: 租户命中黑名单，禁止自动通过, severity: HIGH }
+      - { action: setDecision, value: REJECT }
+  - id: R-RISK-007
+    description: ENTERPRISE 大配额需要架构评审
+    severity: MEDIUM
+    when:
+      all:
+        - { field: plan, op: eq, value: ENTERPRISE }
+        - { field: quotaSeats, op: gte, value: 200 }
+    then:
+      - { action: addScore, value: 15 }
+      - { action: addFinding, message: ENTERPRISE 且席位 >= 200，需要架构与容量评审, severity: MEDIUM }
+  - id: R-RISK-008
+    description: 企业邮箱域名加分
+    severity: LOW
+    when:
+      all:
+        - { field: contactEmail, op: exists }
+        - { field: contactEmail, op: matches, value: "^[^@\\s]+@[^@\\s]+\\.(com|cn|io|org|net)$" }
+    then:
+      - { action: addScore, value: -5 }
+  - id: R-RISK-009
+    description: 上游已给出高风险评分
+    severity: MEDIUM
+    when: { field: riskScore, op: gte, value: 70 }
+    then:
+      - { action: addScore, value: 10 }
+      - { action: addFinding, message: 上游评估风险分较高，叠加本次评分, severity: MEDIUM }
+  - id: R-RISK-010
+    description: 联系人邮箱缺失
+    severity: LOW
+    when: { field: contactEmail, op: empty }
+    then:
+      - { action: addScore, value: 10 }
+      - { action: addFinding, message: 缺少联系人邮箱，无法完成真实性核验, severity: LOW }
+decision:
+  autoApproveMaxScore: 20
+  rejectMinScore: 80
+  riskLevels:
+    - { level: LOW, maxScore: 20 }
+    - { level: MEDIUM, maxScore: 60 }
+    - { level: HIGH, maxScore: 100 }

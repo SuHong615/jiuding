@@ -1,0 +1,8 @@
+{
+  "tenantId": "t-bigco",
+  "tenantCode": "bigco",
+  "plan": "ENTERPRISE",
+  "riskLevel": "HIGH",
+  "riskScore": 85,
+  "reasons": ["高风险行业，需合规复核"]
+}

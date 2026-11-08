@@ -1,0 +1,15 @@
+{
+  "tenantId": "t-demo-high",
+  "tenantCode": "demo-high",
+  "plan": "ENTERPRISE",
+  "region": "cn-shanghai",
+  "quotaSeats": 800,
+  "quotaStorageGb": 4096,
+  "quotaApiRpm": 60000,
+  "riskLevel": "HIGH",
+  "riskScore": 88,
+  "contactEmail": "ops@demo.com",
+  "attributes": { "industry": "gambling" },
+  "orgUnitCount": 6,
+  "accountCount": 60
+}

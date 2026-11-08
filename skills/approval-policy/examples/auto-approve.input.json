@@ -1,0 +1,8 @@
+{
+  "tenantId": "t-acme",
+  "tenantCode": "acme",
+  "plan": "PRO",
+  "riskLevel": "LOW",
+  "riskScore": 10,
+  "reasons": []
+}

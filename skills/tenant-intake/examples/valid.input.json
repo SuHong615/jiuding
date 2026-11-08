@@ -1,0 +1,9 @@
+{
+  "tenantCode": "acme",
+  "name": "Acme 云服务",
+  "contactEmail": "ops@acme.com",
+  "plan": "standard",
+  "region": "shanghai",
+  "isolationMode": "shared",
+  "quotaSeats": 50
+}

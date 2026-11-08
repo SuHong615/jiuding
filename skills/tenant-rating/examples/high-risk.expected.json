@@ -1,0 +1,5 @@
+{
+  "expectedAdjustment": -59,
+  "expectedFindings": ["R-RATE-001", "R-RATE-003", "R-RATE-005", "R-RATE-007", "R-RATE-009", "R-RATE-011", "R-RATE-013"],
+  "note": "调整分 = 10+6-18-12-12+5+4 = -17? 见规则引擎输出为准；本文件用于人工对账"
+}

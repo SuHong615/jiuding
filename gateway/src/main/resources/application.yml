@@ -1,0 +1,115 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: gateway
+  servlet:
+    multipart:
+      # The gateway only proxies uploads (skill zip / CSV import); it must not
+      # consume multipart bodies before forwarding them (docs/15).
+      enabled: false
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+tenancy:
+  security:
+    # Must stay identical across every service, otherwise cross-service JWT
+    # verification fails (docs/00 §9 + team convention).
+    jwt-secret: ${TENANCY_SECURITY_JWT_SECRET:${TENANCY_JWT_SECRET:tenancy-center-dev-secret-change-me-please}}
+    internal-token: ${TENANCY_INTERNAL_TOKEN:dev-internal-token}
+    token-ttl-minutes: ${TENANCY_JWT_TTL_MINUTES:120}
+    api-keys: ${TENANCY_SECURITY_API_KEYS:dev-mcp-key}
+    whitelist:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /api/auth/login
+      # v6 second MFA step (docs/16 搂3) is also pre-authentication.
+      - /api/auth/login/mfa
+      # v6 OIDC/SSO endpoints (docs/16 §2) are part of the login flow and unauthenticated.
+      - /api/auth/oidc
+      - /api/auth/oidc/**
+      # /internal/** is a service-to-service surface that must never be exposed by the
+      # gateway. It is whitelisted so the shared AuthFilter does not answer 401/500 first;
+      # InternalPathController always replies with a uniform 404 instead.
+      - /internal
+      - /internal/**
+      # v5 public self-service onboarding (docs/15 §6) is unauthenticated by contract.
+      - /api/public
+      - /api/public/**
+      # v5: /mcp is authenticated by mcp-service itself (static env key or per-user DB key).
+      # The gateway must not pre-reject personal keys.
+      - /mcp
+      - /mcp/**
+      # v6 SCIM 2.0 (docs/16 §7.1): the tenant-bound scim_ Bearer token is validated by
+      # tenant-service; the gateway must relay the request (and Authorization) untouched.
+      - /scim
+      - /scim/**
+      - /error
+  auth:
+    # Optional JSON array override, e.g.
+    # [{"userId":"u-admin","username":"admin","password":"Admin@123","tenantId":null,"roles":["PLATFORM_ADMIN"]}]
+    users-json: ${TENANCY_USERS:}
+    # Brute-force protection for POST /api/auth/login only (docs/14 §4).
+    # Sliding window per clientIp:username; over the limit -> HTTP 429 code 42900.
+    login-rate-limit:
+      enabled: ${TENANCY_LOGIN_RATE_LIMIT_ENABLED:true}
+      max-requests: ${TENANCY_LOGIN_RATE_LIMIT:10}
+      window-seconds: ${TENANCY_LOGIN_RATE_WINDOW_SECONDS:60}
+    # v6 OIDC / SSO (docs/16 §2). Disabled by default; all values env-overridable.
+    oidc:
+      enabled: ${TENANCY_OIDC_ENABLED:false}
+      provider-name: ${TENANCY_OIDC_PROVIDER:企业 SSO}
+      issuer: ${TENANCY_OIDC_ISSUER:}
+      client-id: ${TENANCY_OIDC_CLIENT_ID:}
+      client-secret: ${TENANCY_OIDC_CLIENT_SECRET:}
+      redirect-uri: ${TENANCY_OIDC_REDIRECT_URI:http://localhost:30080/api/auth/oidc/callback}
+      scopes: ${TENANCY_OIDC_SCOPES:openid,profile,email}
+      frontend-redirect: ${TENANCY_OIDC_FRONTEND_REDIRECT:http://localhost:30088/sso-callback}
+      role-claim: ${TENANCY_OIDC_ROLE_CLAIM:roles}
+      default-role: ${TENANCY_OIDC_DEFAULT_ROLE:AUDITOR}
+      state-secret: ${TENANCY_OIDC_STATE_SECRET:${TENANCY_SECURITY_JWT_SECRET:tenancy-center-dev-secret-change-me-please}}
+      state-ttl-seconds: ${TENANCY_OIDC_STATE_TTL_SECONDS:600}
+      discovery-cache-seconds: ${TENANCY_OIDC_DISCOVERY_CACHE_SECONDS:300}
+      request-timeout-ms: ${TENANCY_OIDC_REQUEST_TIMEOUT_MS:5000}
+  gateway:
+    tenant-service-url: ${TENANT_SERVICE_URL:http://localhost:8081}
+    approval-service-url: ${APPROVAL_SERVICE_URL:http://localhost:8082}
+    agent-service-url: ${AGENT_SERVICE_URL:http://localhost:8083}
+    mcp-service-url: ${MCP_SERVICE_URL:http://localhost:8084}
+    request-timeout-ms: ${TENANCY_GATEWAY_REQUEST_TIMEOUT_MS:10000}
+    mcp-timeout-ms: ${TENANCY_GATEWAY_MCP_TIMEOUT_MS:30000}
+    health-timeout-ms: ${TENANCY_GATEWAY_HEALTH_TIMEOUT_MS:2000}
+    connect-timeout-ms: ${TENANCY_GATEWAY_CONNECT_TIMEOUT_MS:5000}
+
+logging:
+  level:
+    com.suhong.jiuding.gateway: INFO

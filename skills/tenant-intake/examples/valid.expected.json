@@ -1,0 +1,11 @@
+{
+  "skillId": "tenant-intake",
+  "verdict": "PASS",
+  "score": 5,
+  "decision": "AUTO_APPROVE",
+  "findings": [
+    {"ruleId": "R-INTAKE-004", "severity": "LOW", "message": "plan 使用别名，已按规范归一化"},
+    {"ruleId": "R-INTAKE-005", "severity": "LOW", "message": "region 使用别名，已归一化为标准区域码"}
+  ],
+  "normalized": {"plan": "PRO", "region": "cn-shanghai", "isolationMode": "SHARED_SCHEMA"}
+}

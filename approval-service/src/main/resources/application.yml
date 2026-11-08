@@ -1,0 +1,92 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+server:
+  port: 8082
+
+spring:
+  application:
+    name: approval-service
+  profiles:
+    default: dev
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  sql:
+    init:
+      mode: never
+  mvc:
+    throw-exception-if-no-handler-found: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+tenancy:
+  security:
+    jwt-secret: ${TENANCY_JWT_SECRET:tenancy-center-dev-secret-change-me-please}
+    internal-token: ${TENANCY_INTERNAL_TOKEN:dev-internal-token}
+    api-keys:
+      - ${TENANCY_SECURITY_API_KEYS:dev-mcp-key}
+    whitelist:
+      - /actuator/**
+      - /error
+  approval:
+    agent-service-url: ${AGENT_SERVICE_URL:http://localhost:8083}
+    tenant-service-url: ${TENANT_SERVICE_URL:http://localhost:8081}
+    internal-token: ${TENANCY_INTERNAL_TOKEN:dev-internal-token}
+    downstream-api-key: ${TENANCY_SECURITY_API_KEYS:dev-mcp-key}
+    connect-timeout-ms: ${APPROVAL_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${APPROVAL_READ_TIMEOUT_MS:5000}
+    scan-interval-ms: ${APPROVAL_SCAN_INTERVAL_MS:30000}
+    l1-sla-hours: ${APPROVAL_L1_SLA_HOURS:24}
+    l2-sla-hours: ${APPROVAL_L2_SLA_HOURS:8}
+    default-risk-level: MEDIUM
+    provisioning-retry-delay-seconds: ${APPROVAL_PROVISIONING_RETRY_DELAY_SECONDS:30}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:file:./data/approval;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${APPROVAL_DB_URL:jdbc:postgresql://localhost:5432/approval_db}
+    driver-class-name: org.postgresql.Driver
+    username: ${APPROVAL_DB_USER:tenancy}
+    password: ${APPROVAL_DB_PASSWORD:tenancy}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000

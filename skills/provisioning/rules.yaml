@@ -1,0 +1,66 @@
+# Copyright 2026 suhong
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @author suhong
+skillId: provisioning
+version: 1.0.0
+initialScore: 0
+rules:
+  - id: R-PRV-001
+    description: ENTERPRISE 计费分层
+    severity: LOW
+    when: { field: plan, op: eq, value: ENTERPRISE }
+    then:
+      - { action: addTag, value: "tier:enterprise" }
+      - { action: addScore, value: 5 }
+  - id: R-PRV-002
+    description: FREE 计费分层
+    severity: LOW
+    when: { field: plan, op: eq, value: FREE }
+    then:
+      - { action: addTag, value: "tier:free" }
+  - id: R-PRV-003
+    description: 独立 schema 隔离
+    severity: LOW
+    when: { field: isolationMode, op: eq, value: DEDICATED_SCHEMA }
+    then:
+      - { action: addTag, value: "isolation:dedicated-schema" }
+  - id: R-PRV-004
+    description: 独立数据库隔离
+    severity: LOW
+    when: { field: isolationMode, op: eq, value: DEDICATED_DB }
+    then:
+      - { action: addTag, value: "isolation:dedicated-db" }
+  - id: R-PRV-005
+    description: 高风险租户开通后需复核
+    severity: LOW
+    when: { field: riskLevel, op: eq, value: HIGH }
+    then:
+      - { action: addTag, value: "review:post-provision" }
+      - { action: addFinding, message: 高风险租户开通后需 24h 内复核, severity: LOW }
+  - id: R-PRV-006
+    description: 区域已解析
+    severity: LOW
+    when: { field: region, op: exists }
+    then:
+      - { action: addTag, value: "region:resolved" }
+  - id: R-PRV-007
+    description: 租户编码符合命名规范
+    severity: LOW
+    when:
+      all:
+        - { field: tenantCode, op: exists }
+        - { field: tenantCode, op: matches, value: "^[a-z][a-z0-9-]{2,31}$" }
+    then:
+      - { action: addScore, value: -5 }
