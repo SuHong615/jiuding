@@ -16,7 +16,7 @@
 
 ## 代码规范
 - Java：包路径统一 `com.suhong.jiuding.*`；新文件必须包含 Apache-2.0 头与 `@author suhong`
-- TypeScript/前端：与现有 Codex 设计规范一致（`docs/12-codex-ui-spec.md`）
+- TypeScript/前端：与现有 开发者工具 UI 规范一致（`docs/12-ui-design-spec.md`）
 - 禁止提交密钥、kubeconfig、`.env`、本地数据目录
 - 数据库变更使用 Flyway 新版本（不得修改已发布迁移）
 

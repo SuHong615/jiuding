@@ -102,6 +102,7 @@ jiuding/
 | 文档 | 说明 |
 |---|---|
 | [产品指引](docs/PRODUCT_GUIDE.md) | 定位、非生产级声明、流程、配置、路线图 |
+| [法律与合规](docs/LEGAL.md) | 许可证、商标、专利、隐私、导出与分发义务自查 |
 | [GitHub 开源提交指引](docs/OPEN_SOURCE_GUIDE.md) | 许可证合规、仓库配置、CI、Release 清单 |
 | [仓库结构](docs/REPO_STRUCTURE.md) | 目录规范、命名、重构记录 |
 | [架构设计](docs/01-architecture.md) | 上下文/组件/状态机/部署/ADR |
@@ -130,7 +131,16 @@ E2E：`tests/e2e.ps1`、`e2e-v2`、`e2e-v3`、`e2e-v4`、`e2e-v5`、`e2e-skill`�
 ## 许可证
 
 自研代码与文档采用 **Apache License 2.0**（见 [LICENSE](LICENSE)），版权人 **suhong**。
-第三方组件保留其各自许可证，详见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 与 [NOTICE](NOTICE)。
+第三方组件保留其各自许可证，详见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)、[NOTICE](NOTICE) 与 [LICENSES/](LICENSES/)。
+
+### 法律与商标声明
+
+- **非关联**：本项目为独立开源项目，与 AgentScope/Alibaba、OpenAI、以及任何使用“九鼎 / Jiuding”名称的公司或产品**无关联、无背书**。
+- **“九鼎 / Jiuding”** 为项目代号，本项目不主张商标权；商业使用前请自行做商标检索/注册。
+- **Codex-inspired** 仅描述视觉风格参考，与 OpenAI Codex 无关联、无背书。
+- **演示数据**：仓库内租户/账号/邮箱/手机号均为虚构数据；默认账号与密钥仅用于本地。
+- **非生产级**：0.9.0 为预发布，按 Apache-2.0 “AS IS” 提供，不附带担保。
+- 详细法律风险自查与分发义务见 [docs/LEGAL.md](docs/LEGAL.md)。
 
 ## 作者
 

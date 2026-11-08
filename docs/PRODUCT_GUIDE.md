@@ -43,7 +43,7 @@
 5. **Skill 中心**：技能的编辑、审核、版本、调试、启用与热加载；
 6. **Agent 运行时**：基于 AgentScope 的 ReActAgent（风险审查/准入/策略/开通），运行轨迹可读；
 7. **MCP 开放接口**：22 个工具 + 资源/提示词；按人 API Key、调用审计、外部 MCP 服务器配置；
-8. **运营控制台**：Codex 风格前端（租户/组织/账号/评级/审批/技能/Agent/MCP/权限/入驻/SCIM）；
+8. **运营控制台**：开发者工具极简风格（Codex-inspired）前端（租户/组织/账号/评级/审批/技能/Agent/MCP/权限/入驻/SCIM）；
 9. **CLI 与自动化**：`jiuding`（兼容 `tenancy` 别名）命令行覆盖主要运维动作；
 10. **企业身份**：OIDC/SSO、MFA（TOTP+恢复码）、SCIM 2.0 用户/组织同步。
 
@@ -154,7 +154,7 @@ cd frontend; npm install; npm run dev
 | `mcp-service` | MCP JSON-RPC/SSE、22 工具、API Key/审计/外部 MCP |
 | `gateway` | 登录（平台/租户/SSO/MFA）、限流、路由代理、平台聚合 |
 | `tenancy-cli` | `jiuding` CLI（兼容 `tenancy`） |
-| `frontend` | React + TS 控制台（Codex 风格） |
+| `frontend` | React + TS 控制台（开发者工具极简风格（Codex-inspired）） |
 | `skills/` | 5 个内置技能包（INTAKE/RISK/APPROVAL/PROVISIONING/RATING） |
 
 数据：PostgreSQL（tenant_db / approval_db / agent_db / mcp_db），Flyway 迁移；开发可用 H2。

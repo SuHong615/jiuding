@@ -36,7 +36,7 @@ Node 版本：>= 18（本机验证 Node 25 / npm 11）。开发环境依赖网�
 
 ## 主题
 
-整体遵循 `docs/12-codex-ui-spec.md`：白底 `#ffffff`、正文 `#0d0d0d`、1px `#e5e5e5` 边框、8px 圆角、
+整体遵循 `docs/12-ui-design-spec.md`：白底 `#ffffff`、正文 `#0d0d0d`、1px `#e5e5e5` 边框、8px 圆角、
 无渐变/无彩色阴影、紧凑表格与黑色主按钮。`src/index.css` 的 `:root` 为唯一 token 源。
 
 ## v3 账号登录与权限

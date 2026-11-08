@@ -1,23 +1,35 @@
 九鼎 · 多租户智能中枢（Jiuding · Multi-Tenant Intelligence Hub）
 Copyright 2026 suhong
+Project: https://github.com/SuHong615/jiuding
 
-本产品以 Apache License, Version 2.0 发布（见 LICENSE 文件）。
+本产品以 Apache License, Version 2.0 发布（全文见 LICENSE 与 LICENSES/Apache-2.0.txt）。
 
-本产品使用了以下开源软件/组件（其各自许可证见 THIRD_PARTY_LICENSES.md）：
-- AgentScope Java Runtime（Apache License 2.0）
-- Spring Boot / Spring Framework（Apache License 2.0）
-- Flyway（Apache License 2.0）
-- PostgreSQL JDBC Driver（BSD 2-Clause）
-- H2 Database（MPL 2.0 / EPL 1.0 双许可，按 MPL 2.0 使用）
-- Jackson（Apache License 2.0）
-- picocli（Apache License 2.0）
-- React / React DOM（MIT）
-- Vite（MIT）
-- TypeScript（Apache License 2.0）
-- PostgreSQL（PostgreSQL License）
-- nginx（BSD 2-Clause）
-- Eclipse Temurin（GPLv2 with Classpath Exception）
-- curl（curl License / MIT-like）
+## 商标与非关联声明 / Trademarks & Non-Affiliation
 
-第三方组件的版权与许可归其各自作者所有；本产品仅在其许可条款允许范围内使用。
-如对第三方许可有疑问，请联系：suhong（GitHub: @suhong）。
+- “九鼎 / Jiuding”是本项目的**项目代号/产品名**，本项目**不主张商标权**，与任何使用相同或近似名称的公司、产品、服务机构**无关联、无背书**。
+- “Codex-inspired”仅描述 UI 视觉风格参考，与 OpenAI 及其 Codex 产品**无任何关联、合作或背书**。
+- 文中出现的 AgentScope、Spring、Spring Boot、React、Vite、PostgreSQL、Flyway、H2、nginx、Eclipse Temurin、Kubernetes、k3s 等名称，均为其各自权利人的商标或项目名，仅用于指明依赖、兼容性或技术来源（nominative fair use），不暗示官方背书。
+- 如权利人认为本项目使用方式不当，请通过 GitHub Issue/安全渠道联系，我们会及时调整或移除。
+
+## 第三方组件归属 / Third-Party Attribution
+
+- **AgentScope Java**（`io.agentscope:agentscope-core`，Apache-2.0，Copyright AgentScopeTeam / Alibaba）：`agent-kernel` 是围绕其公开 API 的独立封装，本项目未复制其源码；AgentScope 名称与版权归其作者所有。
+- Spring Boot / Spring Framework、Jackson、Flyway、picocli、Kubernetes/k3s：Apache-2.0。
+- H2 Database：MPL-2.0（本项目未修改其源码）。
+- PostgreSQL、PostgreSQL JDBC Driver：PostgreSQL License / BSD-2-Clause。
+- React、React DOM、React Router、Vite：MIT。
+- TypeScript：Apache-2.0。
+- nginx：BSD-2-Clause。
+- Eclipse Temurin 17 JRE：GPLv2 with Classpath Exception（源码获取见 LICENSES/Temurin-GPLv2-CPE.md）。
+- curl：curl License。
+- Logback：EPL-1.0 / LGPL-2.1（本项目按 EPL-1.0 合规使用）。
+
+完整列表、许可证文本与分发义务见 `THIRD_PARTY_LICENSES.md` 与 `LICENSES/`。
+
+## 演示数据声明 / Demo Data Notice
+
+仓库中的租户、组织、账号、邮箱（example.com）、手机号等均为**虚构演示数据**，不包含真实个人信息。请勿将本仓库的默认账号、默认密钥或演示数据用于生产环境。
+
+## 免责声明 / Disclaimer
+
+本软件按 Apache-2.0 “AS IS” 提供，不附带任何明示或默示担保；作者不对使用本软件造成的直接或间接损失、数据泄露、合规处罚承担责任。当前版本为 0.9.0 预发布，**非生产级**。详见 `docs/LEGAL.md` 与 `SECURITY.md`。

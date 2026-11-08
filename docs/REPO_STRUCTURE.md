@@ -15,7 +15,7 @@ jiuding/
 ├─ mcp-service/                # MCP JSON-RPC/SSE/工具/API Key/审计/外部服务器
 ├─ gateway/                    # 登录（平台/租户/SSO/MFA）/限流/路由/平台聚合
 ├─ tenancy-cli/                # CLI（命令名 jiuding，兼容别名 tenancy）
-├─ frontend/                   # React + TS 控制台（Codex 风格）
+├─ frontend/                   # React + TS 控制台（开发者工具极简风格（Codex-inspired））
 ├─ skills/                     # 5 个内置技能包（SKILL.md + rules.yaml + examples）
 ├─ deploy/                     # docker-compose/Dockerfile/postgres init/k8s 清单与脚本
 │  └─ k8s/                     # k3s 清单、prod overlay、零中断/镜像更新脚本

@@ -13,7 +13,7 @@
 ## [0.9.0] - 2026-11-08
 
 ### Added
-- 多租户中心：租户生命周期、审批自动化、租户采集、Skill 规则引擎、MCP 服务、Agent 运行时、CLI、Codex 风格控制台
+- 多租户中心：租户生命周期、审批自动化、租户采集、Skill 规则引擎、MCP 服务、Agent 运行时、CLI、开发者工具极简风格（Codex-inspired）控制台
 - 组织/账号/评级（五维评级、周期刷新）、租户账号登录、五档 RBAC
 - 账号安全：锁定/解锁、本人改密、登录审计（IP/UA）、审计 CSV 导出、PII 掩码、登录限流
 - 技能中心：卡片分块 + 单 Skill 六页签（内容/代码/审查/调试/版本/启用），上传/审核/版本/调试/热加载
@@ -27,6 +27,10 @@
 
 ### Security
 - 默认密钥仅用于本地演示，禁止用于生产；部署时必须覆盖 `TENANCY_SECURITY_JWT_SECRET`、`TENANCY_INTERNAL_TOKEN`、`TENANCY_SECURITY_API_KEYS`、数据库口令与 `MCP_DB_PASSWORD`
+
+### Legal
+- Apache-2.0 许可、NOTICE、第三方许可证文本（`LICENSES/`）、`docs/LEGAL.md` 法律风险自查
+- 商标/非关联声明（九鼎/Jiuding、Codex-inspired）；设计文档更名为 `docs/12-ui-design-spec.md`
 
 ### Known Limitations
 - **非生产级**：单区域参考实现，未做数据面隔离与灾备，未做容量/安全认证

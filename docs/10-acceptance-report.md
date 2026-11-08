@@ -18,12 +18,12 @@
 | **v4 账号安全/合规 E2E** | ✅ **20/20 PASS**（`tests/e2e-v4.ps1`：锁定/解锁/改密/登录审计/CSV/掩码/评级 delta/限流） |
 | **k8s 生产化** | ✅ 2 副本 + PDB/HPA + CronJob；滚动重启 **0 失败**；CronJob `refreshed=14` |
 | 前端生产构建 | ✅ 0 TypeScript 错误；dist 349.7 KB（JS gzip 95.6 KB / CSS gzip 7.8 KB） |
-| UI 风格 | ✅ Codex tokens 生效（白底 `#ffffff` / 正文 `#0d0d0d` / 细边框 / 无渐变） |
+| UI 风格 | ✅ developer-tool design tokens 生效（白底 `#ffffff` / 正文 `#0d0d0d` / 细边框 / 无渐变） |
 | CLI | ✅ 59 测试全绿；新增 `auth login --tenant-code` / `auth whoami` |
 | Docker Compose | ✅ 7 容器 healthy（v4 镜像），`scripts/verify.ps1` 13/13 PASS |
 | Kubernetes（k3s） | ✅ 生产 overlay：6 服务 **2/2** 副本 + PDB/HPA + CronJob ×2；零中断；Flyway 至 tenant v5 / mcp v1 / agent v2 |
 
-**结论：v1（多租户+审批自动化+采集+MCP）、v2（组织/账号/评级/Codex UI）、v3（租户账号登录+五档 RBAC+评级周期化）、v4（账号安全/合规导出/评级增量/生产化）全部在 k3s 与 Docker Compose 双环境端到端验证通过。**
+**结论：v1（多租户+审批自动化+采集+MCP）、v2（组织/账号/评级/开发者工具极简 UI）、v3（租户账号登录+五档 RBAC+评级周期化）、v4（账号安全/合规导出/评级增量/生产化）全部在 k3s 与 Docker Compose 双环境端到端验证通过。**
 
 ## 2. 测试明细（全量 473）
 
@@ -62,7 +62,7 @@
 ### 3.4 MCP（22 工具）
 14 基础 + 8 身份域（org.tree/org.create/account.list/account.create/account.reset_password/rating.assess/rating.list/tenant.delete）；数组型结果统一包装为 `{count, items}` 满足 MCP object 约束。
 
-### 3.5 UI（Codex 风格）
+### 3.5 UI（开发者工具极简风格）
 构建产物 CSS 含 `#0d0d0d`/`#ffffff`、不含 `radial-gradient`；登录页双模式 + 租户代码；按五档角色收敛写操作；评级趋势 SVG；k8s nginx `GET /` 200、`POST /api/auth/login` 反代成功。
 
 ## 4. Kubernetes 部署实测
@@ -168,7 +168,7 @@
 | 评级 | 五维加权 + Skill 调整；历史 append-only；人工覆盖需 reason；每日定时刷新 |
 | 删除 | 软删 + 默认过滤；ACTIVE 先终止；平台管理员专属；全量审计 |
 | API | 资源嵌套 REST、统一分页/错误码、幂等状态变更、乐观锁 |
-| UI | Codex design tokens + 五档角色权限 UI + 可访问性 |
+| UI | developer-tool design tokens + 五档角色权限 UI + 可访问性 |
 
 ## 6. 环境约束与已知限制
 

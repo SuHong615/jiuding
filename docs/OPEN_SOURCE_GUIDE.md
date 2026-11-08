@@ -81,7 +81,20 @@
 
 **不要**宣称：生产就绪、开箱即用、零信任、等保合规、已通过安全认证。
 
-## 8. 维护者
+## 8. 法律合规检查清单（发布前逐项核对）
+
+- [ ] `LICENSE`（Apache-2.0）、`NOTICE`、`THIRD_PARTY_LICENSES.md`、`LICENSES/` 均在根目录
+- [ ] 源文件头齐全：Apache-2.0 头 + `@author suhong`（CI 校验）
+- [ ] 依赖许可证兼容性复核：无 AGPL/SSPL；MPL/EPL/GPL+CE 义务已记录（见 `docs/LEGAL.md`）
+- [ ] 未复制第三方源码；若参考/改编，已在 `NOTICE` 署名
+- [ ] 商标使用：产品名/风格名无暗示背书；已附非关联声明（九鼎/Jiuding、Codex-inspired）
+- [ ] 演示数据不含真实个人信息；默认账号/密钥仅本地
+- [ ] 无 `.env`、私钥、kubeconfig、真实令牌等敏感文件入库
+- [ ] 二进制/Docker 分发时随附许可证与源码获取方式（Temurin/H2/nginx/PostgreSQL/curl）
+- [ ] 商业发行前：律师复核、商标检索、FOSSA/ScanCode 扫描、DPIA、出口管制分类
+- [ ] 安全问题联系渠道（`SECURITY.md`）有效
+
+## 9. 维护者
 
 - 作者/维护者：**suhong**
 - 安全问题：见 `SECURITY.md`（私密报告）
