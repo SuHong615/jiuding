@@ -107,8 +107,12 @@ public class TenantExportService {
             throw BizException.forbidden(
                     "platform administrator, tenant administrator or auditor role required");
         }
-        if (!mask && !platform) {
-            throw BizException.forbidden("mask=false requires a platform administrator");
+        com.suhong.jiuding.common.security.Principal principal =
+                com.suhong.jiuding.common.security.AuthContext.get();
+        boolean platformJwt = principal != null && "JWT".equals(principal.authType())
+                && scope.isPlatformAdmin();
+        if (!mask && !platformJwt) {
+            throw BizException.forbidden("mask=false requires a platform administrator JWT");
         }
 
         int orgUnitCount = (int) orgUnits.countByTenant(tenant.id());
