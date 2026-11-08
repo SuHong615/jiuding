@@ -18,6 +18,7 @@
 package com.suhong.jiuding.tenant.mfa;
 
 import com.suhong.jiuding.common.api.ApiResponse;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import jakarta.validation.Valid;
 import org.slf4j.MDC;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Self-service MFA API (docs/16 section 3). Every endpoint operates on the authenticated
- * tenant account itself; there is no administrative override.
+ * tenant account itself; there is no administrative override. The permission annotation
+ * grants access to administrators (account:security) and to the account owner via the
+ * self-service password permission (account:write, MEMBER holds ACCOUNT_CHANGE_PASSWORD);
+ * the "self only" check stays in {@link MfaService}.
  */
 @RestController
 @RequestMapping("/api/me/mfa")
@@ -41,21 +45,25 @@ public class MfaController {
     }
 
     @GetMapping
+    @RequirePermission({"account:security", "account:write"})
     public ApiResponse<MfaStatusView> status() {
         return ok(mfaService.status());
     }
 
     @PostMapping("/setup")
+    @RequirePermission({"account:security", "account:write"})
     public ApiResponse<MfaSetupResult> setup() {
         return ok(mfaService.setup());
     }
 
     @PostMapping("/verify")
+    @RequirePermission({"account:security", "account:write"})
     public ApiResponse<MfaVerifyResult> verify(@Valid @RequestBody MfaCodeRequest request) {
         return ok(mfaService.verify(request));
     }
 
     @PostMapping("/disable")
+    @RequirePermission({"account:security", "account:write"})
     public ApiResponse<MfaStatusView> disable(@Valid @RequestBody MfaCodeRequest request) {
         return ok(mfaService.disable(request));
     }

@@ -19,6 +19,7 @@ package com.suhong.jiuding.tenant.offboarding;
 
 import com.suhong.jiuding.common.api.ApiResponse;
 import com.suhong.jiuding.tenant.api.TenantView;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import jakarta.validation.Valid;
 import org.slf4j.MDC;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +40,7 @@ public class TenantOffboardController {
     }
 
     @PostMapping("/offboard")
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> offboard(@PathVariable String tenantId,
                                             @Valid @RequestBody OffboardRequest request) {
         return ApiResponse.ok(offboardService.offboard(tenantId, request), MDC.get("requestId"));

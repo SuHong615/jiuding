@@ -17,6 +17,7 @@
  */
 package com.suhong.jiuding.tenant.export;
 
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +42,7 @@ public class TenantExportController {
     }
 
     @GetMapping("/export")
+    @RequirePermission("audit:read")
     public ResponseEntity<byte[]> export(@PathVariable String tenantId,
                                          @RequestParam(defaultValue = "true") boolean mask) {
         TenantExportService.ExportResult result = exportService.export(tenantId, mask);

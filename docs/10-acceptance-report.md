@@ -8,7 +8,7 @@
 | 维度 | 结果 |
 |---|---|
 | 后端编译（9 模块） | ✅ BUILD SUCCESS |
-| 自动化测试 | ✅ **536 个测试全部通过**（0 失败 / 0 错误 / 0 跳过） |
+| 自动化测试 | ✅ **541 个测试全部通过**（0 失败 / 0 错误 / 0 跳过） |
 | v1 端到端 E2E | ✅ **16/16 PASS**（`integration/verify.ps1`，k8s） |
 | v2 身份域 E2E | ✅ **31/31 PASS**（`tests/e2e-v2.ps1`：组织/账号/评级/软删） |
 | v3 租户登录/RBAC E2E | ✅ **42/42 PASS**（`tests/e2e-v3.ps1`：租户账号登录、ORG_ADMIN 子树、MEMBER 只读、auditor 跨租户、锁定） |
@@ -25,13 +25,13 @@
 
 **结论：v1（多租户+审批自动化+采集+MCP）、v2（组织/账号/评级/开发者工具极简 UI）、v3（租户账号登录+五档 RBAC+评级周期化）、v4（账号安全/合规导出/评级增量/生产化）全部在 k3s 与 Docker Compose 双环境端到端验证通过。**
 
-## 2. 测试明细（全量 536）
+## 2. 测试明细（全量 541）
 
 | 模块 | 测试数 | 覆盖重点 |
 |---|---|---|
 | `agent-kernel` | 2 | AgentScope 2.0.4 ReActAgent 工具调用通路 |
 | `tenancy-common` | 18 | JWT（含 oid）/AuthFilter/内部令牌/租户头/失败关闭 |
-| `tenant-service` | **211** | v3 86 + v4 16：登录事件审计（IP/UA/原因）、解锁、本人改密、审计 CSV 导出、PII 掩码、评级 delta/等级变化审计、内部 refresh、组织树/评级事务/软删 |
+| `tenant-service` | **216** | v3 86 + v4 16：登录事件审计（IP/UA/原因）、解锁、本人改密、审计 CSV 导出、PII 掩码、评级 delta/等级变化审计、内部 refresh、组织树/评级事务/软删 |
 | `approval-service` | 35 | 工作流/自动决策/SLA/权限/下游重试 |
 | `agent-service` | **80** | 规则引擎、5 个技能包（RATING 类型）、Agent 运行 |
 | `mcp-service` | **45** | 22 工具 schema/调用映射、数组→对象 structuredContent、错误映射、SSE、鉴权 |
@@ -188,7 +188,7 @@
 - 已标注 Tenant/OrgUnit/Account/Rating/Role/Permission 关键控制器；SecurityScope/TenantAccess 子树与租户隔离仍为附加门。
 - 测试：新增 5 类 15 例（目录映射、缓存 TTL/evict、拦截矩阵、自定义角色即时生效/撤销、平台直通）；tenant-service **211 tests** 全绿。
 - 部署后 `scripts/verify.ps1` **19/19 PASS**（v1~v8 全链路无回归）。
-- 限制：Phase 1 仅覆盖关键控制器（SCIM/quota/export/offboard/MFA 未标注）；缓存单实例内存；多副本各自 60s。
+- Phase 2：quota→rating:read、export→audit:read、offboard→tenant:write、MFA→account:security/write、SCIM token→rbac:write；新增 2 测试类 5 例；tenant 216 全绿，部署后 verify 19/19。
 ## 5. 架构审查与最佳实践落实（docs/11、docs/13）
 
 | 主题 | 决策 |
@@ -221,7 +221,7 @@
 ## 7. 复现命令
 
 ```powershell
-mvn -B -f D:\deepseekHarness\tenancy-center\pom.xml test          # 536 tests
+mvn -B -f D:\deepseekHarness\tenancy-center\pom.xml test          # 541 tests
 cd D:\deepseekHarness\tenancy-center\frontend; npm run build
 # k8s 更新与验收
 wsl -d opencode-docker -e /bin/sh /mnt/d/deepseekHarness/tenancy-center/deploy/k8s/update-images.sh

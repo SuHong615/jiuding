@@ -18,6 +18,7 @@
 package com.suhong.jiuding.tenant.quota;
 
 import com.suhong.jiuding.common.api.ApiResponse;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import org.slf4j.MDC;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +37,7 @@ public class QuotaController {
     }
 
     @GetMapping
+    @RequirePermission("rating:read")
     public ApiResponse<QuotaView> quota(@PathVariable String tenantId) {
         return ApiResponse.ok(quotaService.quota(tenantId), MDC.get("requestId"));
     }

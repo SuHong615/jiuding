@@ -131,8 +131,18 @@ abstract class AbstractPermissionWebTest {
     }
 
     protected String bearer(Set<String> roles, String tenantCode, String orgUnitId) {
+        return bearer("u-test", "tester", roles, tenantCode, orgUnitId);
+    }
+
+    protected String bearer(String userId, String username, Set<String> roles,
+                            String tenantCode, String orgUnitId) {
         return "Bearer " + jwtService.issue(
-                new Principal("u-test", "tester", tenantCode, roles, "JWT", orgUnitId));
+                new Principal(userId, username, tenantCode, roles, "JWT", orgUnitId));
+    }
+
+    protected String accountId(String username) {
+        return jdbc.queryForObject("SELECT id FROM accounts WHERE tenant_id = ? AND username = ?",
+                String.class, tenantId, username);
     }
 
     protected JsonNode read(MvcResult result) throws Exception {

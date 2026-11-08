@@ -18,6 +18,7 @@
 package com.suhong.jiuding.tenant.scim;
 
 import com.suhong.jiuding.common.api.ApiResponse;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import jakarta.validation.Valid;
 import org.slf4j.MDC;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -46,16 +47,19 @@ public class ScimTokenController {
     }
 
     @GetMapping
+    @RequirePermission("rbac:write")
     public ApiResponse<List<ScimTokenView>> list(@RequestParam(required = false) String tenantId) {
         return ApiResponse.ok(tokenService.list(tenantId), MDC.get("requestId"));
     }
 
     @PostMapping
+    @RequirePermission("rbac:write")
     public ApiResponse<ScimTokenCreatedView> create(@Valid @RequestBody ScimTokenCreateRequest request) {
         return ApiResponse.ok(tokenService.create(request), MDC.get("requestId"));
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission("rbac:write")
     public ApiResponse<ScimTokenView> revoke(@PathVariable String id) {
         return ApiResponse.ok(tokenService.revoke(id), MDC.get("requestId"));
     }
