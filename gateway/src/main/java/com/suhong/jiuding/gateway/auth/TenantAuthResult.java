@@ -19,13 +19,19 @@ package com.suhong.jiuding.gateway.auth;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.List;
+
 /**
  * Tenant-account authentication result returned by tenant-service
- * ({@code POST /internal/auth/authenticate}, docs/13 搂2.2).
+ * ({@code POST /internal/auth/authenticate}, docs/13 §2.2, docs/20 §3).
  *
  * <p>{@code mfaRequired} / {@code challengeToken} are present when the account has MFA
- * enabled (docs/16 搂3); in that case the password step did not authenticate the account
+ * enabled (docs/16 §3); in that case the password step did not authenticate the account
  * yet and the gateway must answer with a challenge instead of a JWT.
+ *
+ * <p>{@code tenantSelectionRequired} plus {@code tenants} are returned when a username-only
+ * login matches more than one tenant membership (docs/20 §3): the client must then pick a
+ * tenant and retry with an explicit {@code tenantCode}.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TenantAuthResult(String accountId,
@@ -38,13 +44,27 @@ public record TenantAuthResult(String accountId,
                                String orgUnitPath,
                                Boolean mustChangePassword,
                                Boolean mfaRequired,
-                               String challengeToken) {
+                               String challengeToken,
+                               Boolean tenantSelectionRequired,
+                               List<TenantSummary> tenants) {
 
-    /** Backwards-compatible constructor (non-MFA payload). */
+    /** Backwards-compatible constructor (non-MFA, single tenant payload). */
     public TenantAuthResult(String accountId, String tenantId, String tenantCode, String username,
                             String displayName, String role, String orgUnitId, String orgUnitPath,
                             Boolean mustChangePassword) {
         this(accountId, tenantId, tenantCode, username, displayName, role, orgUnitId, orgUnitPath,
-                mustChangePassword, null, null);
+                mustChangePassword, null, null, null, null);
+    }
+
+    /** MFA-step constructor (docs/16 §3). */
+    public TenantAuthResult(String accountId, String tenantId, String tenantCode, String username,
+                            String displayName, String role, String orgUnitId, String orgUnitPath,
+                            Boolean mustChangePassword, Boolean mfaRequired, String challengeToken) {
+        this(accountId, tenantId, tenantCode, username, displayName, role, orgUnitId, orgUnitPath,
+                mustChangePassword, mfaRequired, challengeToken, null, null);
+    }
+
+    public boolean isTenantSelection() {
+        return Boolean.TRUE.equals(tenantSelectionRequired);
     }
 }

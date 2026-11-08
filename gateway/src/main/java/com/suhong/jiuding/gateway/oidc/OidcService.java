@@ -43,13 +43,22 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * OIDC authorization-code + PKCE flow (docs/16 §2).
+ * OIDC authorization-code + PKCE flow (docs/16 §2, docs/20 §3).
  *
- * <p>{@code /api/auth/oidc/authorize} builds a signed stateless state and an S256 PKCE
- * challenge; {@code /api/auth/oidc/callback} verifies the state, exchanges the code, reads
- * the userinfo claims, maps roles ({@code role-claim} → known roles, otherwise
- * {@code default-role}) and signs the same JWT the password login issues. The final step is
- * a 302 to the frontend with the token in the URL fragment (never on the server side).
+ * <p>Supports two configuration sources:
+ * <ul>
+ *   <li>the legacy env-configured provider ({@code tenancy.auth.oidc.*}) — used when it is
+ *       complete and no explicit {@code provider} code is requested;</li>
+ *   <li>dynamic SSO providers loaded from tenant-service
+ *       ({@link SsoProviderClient}) — selected with {@code ?provider=<code>}; the provider
+ *       code is bound into the signed state so the callback uses the right issuer/client.</li>
+ * </ul>
+ *
+ * <p>The flow: {@code /authorize} builds a signed stateless state plus an S256 PKCE
+ * challenge; {@code /callback} verifies the state, exchanges the code, reads userinfo, maps
+ * roles ({@code role-claim} → known roles, otherwise {@code default-role}) and signs the same
+ * JWT as the password login. The final step is a 302 to the provider's frontend redirect URL
+ * with the token in the URL fragment.
  */
 @Service
 public class OidcService {
@@ -61,43 +70,76 @@ public class OidcService {
     private final OidcProperties properties;
     private final OidcStateService stateService;
     private final OidcDiscoveryClient discoveryClient;
+    private final SsoProviderClient ssoProviderClient;
     private final JwtService jwtService;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
     public OidcService(OidcProperties properties, OidcStateService stateService,
-                       OidcDiscoveryClient discoveryClient, JwtService jwtService,
-                       HttpClient httpClient, ObjectMapper objectMapper) {
+                       OidcDiscoveryClient discoveryClient, SsoProviderClient ssoProviderClient,
+                       JwtService jwtService, HttpClient httpClient, ObjectMapper objectMapper) {
         this.properties = properties;
         this.stateService = stateService;
         this.discoveryClient = discoveryClient;
+        this.ssoProviderClient = ssoProviderClient;
         this.jwtService = jwtService;
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
     }
 
     public Map<String, Object> status() {
-        boolean enabled = properties.isUsable();
+        List<SsoProviderConfig> dynamicProviders = ssoProviderClient.enabled();
+        boolean staticUsable = properties.isUsable();
+        boolean enabled = staticUsable || !dynamicProviders.isEmpty();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("enabled", enabled);
-        body.put("providerName", properties.getProviderName());
+        body.put("providerName", providerName(staticUsable, dynamicProviders));
         if (enabled) {
             body.put("loginUrl", "/api/auth/oidc/authorize");
-            body.put("frontendRedirect", properties.getFrontendRedirect());
+            body.put("frontendRedirect", frontendRedirect(staticUsable, dynamicProviders));
+            body.put("providerCount", dynamicProviders.size());
         }
         return body;
     }
 
+    /** True when at least one provider (legacy or dynamic) is configured. */
+    public boolean anyEnabled() {
+        return properties.isUsable() || !ssoProviderClient.enabled().isEmpty();
+    }
+
+    /** Public provider list for the login page (docs/20 §3): no client secrets. */
+    public List<Map<String, Object>> publicProviders() {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (SsoProviderConfig provider : ssoProviderClient.enabled()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("code", provider.code());
+            item.put("name", provider.name());
+            item.put("loginUrl", "/api/auth/oidc/authorize?provider=" + encode(provider.code()));
+            result.add(item);
+        }
+        if (result.isEmpty() && properties.isUsable()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("code", "default");
+            item.put("name", properties.getProviderName());
+            item.put("loginUrl", "/api/auth/oidc/authorize");
+            result.add(item);
+        }
+        return result;
+    }
+
     /** Builds the provider authorization URL (state + PKCE S256 challenge). */
-    public String buildAuthorizationUrl() {
-        OidcDiscoveryClient.Endpoints endpoints = discoveryClient.endpoints();
-        OidcStateService.AuthorizationRequest authorization = stateService.newAuthorizationRequest();
+    public String buildAuthorizationUrl(String providerCode) {
+        RuntimeProvider provider = resolve(providerCode);
+        OidcDiscoveryClient.Endpoints endpoints = discoveryClient.endpoints(provider.issuer(),
+                provider.authorizationEndpoint(), provider.tokenEndpoint(), provider.userinfoEndpoint());
+        OidcStateService.AuthorizationRequest authorization =
+                stateService.newAuthorizationRequest(provider.code());
         String separator = endpoints.authorizationEndpoint().contains("?") ? "&" : "?";
         StringBuilder url = new StringBuilder(endpoints.authorizationEndpoint()).append(separator);
         url.append("response_type=code");
-        url.append("&client_id=").append(encode(properties.getClientId()));
-        url.append("&redirect_uri=").append(encode(properties.getRedirectUri()));
-        url.append("&scope=").append(encode(String.join(" ", scopes())));
+        url.append("&client_id=").append(encode(provider.clientId()));
+        url.append("&redirect_uri=").append(encode(provider.redirectUri()));
+        url.append("&scope=").append(encode(String.join(" ", provider.scopes())));
         url.append("&state=").append(encode(authorization.state()));
         url.append("&code_challenge=").append(encode(authorization.codeChallenge()));
         url.append("&code_challenge_method=S256");
@@ -115,12 +157,14 @@ public class OidcService {
         if (code == null || code.isBlank()) {
             throw new OidcException("invalid_request", "OIDC callback is missing the code parameter");
         }
-        OidcDiscoveryClient.Endpoints endpoints = discoveryClient.endpoints();
-        String accessToken = exchangeCode(endpoints, code, session.codeVerifier());
+        RuntimeProvider provider = resolve(session.providerCode());
+        OidcDiscoveryClient.Endpoints endpoints = discoveryClient.endpoints(provider.issuer(),
+                provider.authorizationEndpoint(), provider.tokenEndpoint(), provider.userinfoEndpoint());
+        String accessToken = exchangeCode(provider, endpoints, code, session.codeVerifier());
         Map<String, Object> claims = fetchUserInfo(endpoints, accessToken);
-        Principal principal = toPrincipal(claims);
+        Principal principal = toPrincipal(provider, claims);
         String token = jwtService.issue(principal);
-        StringBuilder redirect = new StringBuilder(frontendRedirect());
+        StringBuilder redirect = new StringBuilder(provider.frontendRedirect());
         redirect.append("#token=").append(encode(token));
         redirect.append("&username=").append(encode(principal.username() == null ? "" : principal.username()));
         return redirect.toString();
@@ -128,15 +172,72 @@ public class OidcService {
 
     /** Redirect target for failures: only a stable error code is exposed (no details). */
     public String errorRedirect(String errorCode) {
-        return frontendRedirect() + "#error=" + encode(errorCode);
+        return frontendRedirectForCode(errorCode) + "#error=" + encode(errorCode);
     }
 
-    private String exchangeCode(OidcDiscoveryClient.Endpoints endpoints, String code, String codeVerifier) {
+    private String frontendRedirectForCode(String errorCode) {
+        if (properties.getFrontendRedirect() != null && !properties.getFrontendRedirect().isBlank()) {
+            return properties.getFrontendRedirect();
+        }
+        List<SsoProviderConfig> providers = ssoProviderClient.enabled();
+        if (!providers.isEmpty() && providers.get(0).frontendRedirect() != null) {
+            return providers.get(0).frontendRedirect();
+        }
+        return "/";
+    }
+
+    /**
+     * Resolves the runtime provider for a request.
+     *
+     * @param providerCode explicit {@code ?provider=} value; may be blank
+     */
+    private RuntimeProvider resolve(String providerCode) {
+        if (providerCode != null && !providerCode.isBlank()) {
+            SsoProviderConfig config = ssoProviderClient.find(providerCode)
+                    .orElseThrow(() -> new OidcException("unknown_provider",
+                            "unknown SSO provider: " + providerCode));
+            return RuntimeProvider.from(config);
+        }
+        if (properties.isUsable()) {
+            return RuntimeProvider.from(properties);
+        }
+        List<SsoProviderConfig> providers = ssoProviderClient.enabled();
+        if (providers.size() == 1) {
+            return RuntimeProvider.from(providers.get(0));
+        }
+        if (providers.size() > 1) {
+            throw new OidcException("provider_required", "provider parameter is required");
+        }
+        throw new OidcException("not_enabled", "OIDC is not enabled");
+    }
+
+    private String providerName(boolean staticUsable, List<SsoProviderConfig> providers) {
+        if (staticUsable) {
+            return properties.getProviderName();
+        }
+        if (!providers.isEmpty() && providers.get(0).name() != null && !providers.get(0).name().isBlank()) {
+            return providers.get(0).name();
+        }
+        return properties.getProviderName();
+    }
+
+    private String frontendRedirect(boolean staticUsable, List<SsoProviderConfig> providers) {
+        if (staticUsable) {
+            return properties.getFrontendRedirect();
+        }
+        if (!providers.isEmpty()) {
+            return providers.get(0).frontendRedirect();
+        }
+        return properties.getFrontendRedirect();
+    }
+
+    private String exchangeCode(RuntimeProvider provider, OidcDiscoveryClient.Endpoints endpoints,
+                                String code, String codeVerifier) {
         String form = "grant_type=authorization_code"
                 + "&code=" + encode(code)
-                + "&redirect_uri=" + encode(properties.getRedirectUri())
-                + "&client_id=" + encode(properties.getClientId())
-                + "&client_secret=" + encode(properties.getClientSecret())
+                + "&redirect_uri=" + encode(provider.redirectUri())
+                + "&client_id=" + encode(provider.clientId())
+                + "&client_secret=" + encode(provider.clientSecret())
                 + "&code_verifier=" + encode(codeVerifier);
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(endpoints.tokenEndpoint()))
@@ -195,7 +296,7 @@ public class OidcService {
         }
     }
 
-    private Principal toPrincipal(Map<String, Object> claims) {
+    private Principal toPrincipal(RuntimeProvider provider, Map<String, Object> claims) {
         String userId = firstText(claims, "sub", "preferred_username", "email");
         if (userId == null) {
             throw new OidcException("oidc_userinfo_failed", "OIDC userinfo has no subject");
@@ -204,24 +305,21 @@ public class OidcService {
         if (username == null) {
             username = userId;
         }
-        Set<String> roles = mapRoles(claims);
+        Set<String> roles = mapRoles(provider, claims);
         return new Principal(userId, username, null, roles, "JWT", null);
     }
 
-    private Set<String> mapRoles(Map<String, Object> claims) {
+    private Set<String> mapRoles(RuntimeProvider provider, Map<String, Object> claims) {
         Set<String> mapped = new LinkedHashSet<>();
-        Object raw = claims.get(properties.getRoleClaim());
+        Object raw = claims.get(provider.roleClaim());
         for (String candidate : roleValues(raw)) {
             String normalized = candidate.trim().toUpperCase(Locale.ROOT);
             if (KNOWN_ROLES.contains(normalized)) {
                 mapped.add(normalized);
             }
         }
-        if (mapped.isEmpty()) {
-            String fallback = properties.getDefaultRole();
-            if (fallback != null && !fallback.isBlank()) {
-                mapped.add(fallback.trim().toUpperCase(Locale.ROOT));
-            }
+        if (mapped.isEmpty() && provider.defaultRole() != null && !provider.defaultRole().isBlank()) {
+            mapped.add(provider.defaultRole().trim().toUpperCase(Locale.ROOT));
         }
         return mapped;
     }
@@ -240,8 +338,7 @@ public class OidcService {
             return values;
         }
         if (raw.getClass().isArray()) {
-            Object[] array = (Object[]) raw;
-            for (Object item : array) {
+            for (Object item : (Object[]) raw) {
                 if (item != null) {
                     values.add(String.valueOf(item));
                 }
@@ -263,20 +360,6 @@ public class OidcService {
         return values;
     }
 
-    private List<String> scopes() {
-        List<String> scopes = new ArrayList<>();
-        for (String scope : properties.getScopes().split("[,\\s]+")) {
-            if (!scope.isBlank()) {
-                scopes.add(scope.trim());
-            }
-        }
-        return scopes;
-    }
-
-    private String frontendRedirect() {
-        return properties.getFrontendRedirect();
-    }
-
     private static String firstText(Map<String, Object> claims, String... keys) {
         for (String key : keys) {
             Object value = claims.get(key);
@@ -289,5 +372,62 @@ public class OidcService {
 
     private static String encode(String value) {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    /** Effective provider settings used by one authorize/callback round-trip. */
+    private record RuntimeProvider(String code,
+                                   String issuer,
+                                   String clientId,
+                                   String clientSecret,
+                                   String redirectUri,
+                                   List<String> scopes,
+                                   String frontendRedirect,
+                                   String roleClaim,
+                                   String defaultRole,
+                                   String authorizationEndpoint,
+                                   String tokenEndpoint,
+                                   String userinfoEndpoint) {
+
+        static RuntimeProvider from(OidcProperties properties) {
+            return new RuntimeProvider(null,
+                    properties.getIssuer(),
+                    properties.getClientId(),
+                    properties.getClientSecret(),
+                    properties.getRedirectUri(),
+                    splitScopes(properties.getScopes()),
+                    properties.getFrontendRedirect(),
+                    properties.getRoleClaim(),
+                    properties.getDefaultRole(),
+                    properties.getAuthorizationEndpoint(),
+                    properties.getTokenEndpoint(),
+                    properties.getUserinfoEndpoint());
+        }
+
+        static RuntimeProvider from(SsoProviderConfig config) {
+            return new RuntimeProvider(
+                    config.code(),
+                    config.issuer(),
+                    config.clientId(),
+                    config.clientSecret(),
+                    config.redirectUri(),
+                    splitScopes(config.scopes()),
+                    config.frontendRedirect(),
+                    config.roleClaim() == null ? "roles" : config.roleClaim(),
+                    config.defaultRole() == null ? "AUDITOR" : config.defaultRole(),
+                    null, null, null);
+        }
+
+        private static List<String> splitScopes(String scopes) {
+            List<String> result = new ArrayList<>();
+            if (scopes == null) {
+                return result;
+            }
+            for (String scope : scopes.split("[,\\s]+")) {
+                if (!scope.isBlank()) {
+                    result.add(scope.trim());
+                }
+            }
+            return result;
+        }
     }
 }

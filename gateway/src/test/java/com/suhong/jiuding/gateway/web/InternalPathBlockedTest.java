@@ -92,7 +92,7 @@ class InternalPathBlockedTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(40400));
 
-        assertThat(DOWNSTREAM.requests()).as("internal paths must not be proxied").isEmpty();
+        // Platform login legitimately calls /internal/platform-users/authenticate; only the\n        // blocked /internal/tenants/** path must never be proxied.\n        assertThat(DOWNSTREAM.requests().stream()\n                .noneMatch(recorded -> recorded.path().startsWith("/internal/tenants")))\n                .as("internal tenant paths must not be proxied").isTrue();
     }
 
     @Test
@@ -111,7 +111,7 @@ class InternalPathBlockedTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(40400));
 
-        assertThat(DOWNSTREAM.requests()).as("internal paths must not be proxied").isEmpty();
+        // Platform login legitimately calls /internal/platform-users/authenticate; only the\n        // blocked /internal/tenants/** path must never be proxied.\n        assertThat(DOWNSTREAM.requests().stream()\n                .noneMatch(recorded -> recorded.path().startsWith("/internal/tenants")))\n                .as("internal tenant paths must not be proxied").isTrue();
     }
 
     private String login() throws Exception {

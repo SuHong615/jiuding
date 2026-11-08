@@ -46,6 +46,8 @@ public class OidcProperties {
     private String stateSecret = "tenancy-center-dev-secret-change-me-please";
     private long stateTtlSeconds = 600L;
     private long discoveryCacheSeconds = 300L;
+    /** Cache for the tenant-service {@code /internal/sso-providers/enabled} list (docs/20 §3). */
+    private long providersCacheSeconds = 60L;
     private int requestTimeoutMs = 5_000;
 
     /** Usable only when the flag is on and the mandatory client settings are present. */
@@ -179,6 +181,14 @@ public class OidcProperties {
 
     public void setDiscoveryCacheSeconds(long discoveryCacheSeconds) {
         this.discoveryCacheSeconds = discoveryCacheSeconds;
+    }
+
+    public long getProvidersCacheSeconds() {
+        return providersCacheSeconds;
+    }
+
+    public void setProvidersCacheSeconds(long providersCacheSeconds) {
+        this.providersCacheSeconds = providersCacheSeconds;
     }
 
     public int getRequestTimeoutMs() {

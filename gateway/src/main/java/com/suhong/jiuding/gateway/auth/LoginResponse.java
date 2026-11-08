@@ -19,12 +19,18 @@ package com.suhong.jiuding.gateway.auth;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.List;
+
 /**
- * {@code POST /api/auth/login} response (docs/02 搂1).
+ * {@code POST /api/auth/login} / {@code /switch-tenant} response (docs/02 §1, docs/16 §3,
+ * docs/20 §3).
  *
- * <p>When the tenant account has MFA enabled the password step returns
- * {@code mfaRequired=true} plus a short-lived {@code challengeToken} instead of a JWT
- * (docs/16 搂3); the client then calls {@code POST /api/auth/login/mfa}.
+ * <p>Three mutually exclusive shapes:
+ * <ul>
+ *   <li>normal login → {@code token/tokenType/expiresIn/principal};</li>
+ *   <li>MFA required → {@code mfaRequired=true + challengeToken + username} (docs/16 §3);</li>
+ *   <li>tenant selection → {@code tenantSelectionRequired=true + tenants:[...]} (docs/20 §3).</li>
+ * </ul>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LoginResponse(String token,
@@ -33,10 +39,24 @@ public record LoginResponse(String token,
                             PrincipalView principal,
                             Boolean mfaRequired,
                             String challengeToken,
-                            String username) {
+                            String username,
+                            Boolean tenantSelectionRequired,
+                            List<TenantSummary> tenants) {
 
     /** Backwards-compatible constructor for the ordinary (non-MFA) login path. */
     public LoginResponse(String token, String tokenType, long expiresIn, PrincipalView principal) {
-        this(token, tokenType, expiresIn, principal, null, null, null);
+        this(token, tokenType, expiresIn, principal, null, null, null, null, null);
+    }
+
+    /** MFA challenge response (docs/16 §3). */
+    public LoginResponse(String token, String tokenType, long expiresIn, PrincipalView principal,
+                         Boolean mfaRequired, String challengeToken, String username) {
+        this(token, tokenType, expiresIn, principal, mfaRequired, challengeToken, username, null, null);
+    }
+
+    /** Tenant selection response (docs/20 §3). */
+    public static LoginResponse tenantSelection(List<TenantSummary> tenants) {
+        return new LoginResponse(null, null, 0, null, Boolean.FALSE, null, null,
+                Boolean.TRUE, tenants == null ? List.of() : List.copyOf(tenants));
     }
 }

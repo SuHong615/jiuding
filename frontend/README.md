@@ -86,6 +86,23 @@ Node 版本：>= 18（本机验证 Node 25 / npm 11）。开发环境依赖网�
 - 新建/编辑租户表单新增 `quotaOrgUnits`（默认 50），并支持修改 seats/orgUnits/storageGb/apiRpm。
 - 账号创建、组织创建与 CSV 导入失败时识别后端 `QUOTA_EXCEEDED`，展示友好配额提示（导入错误行同步转换）。
 
+## v8 导出 / 离户
+
+- 租户详情头部「导出数据」：默认脱敏 JSON（Content-Disposition 文件名，回退 `tenant-<code>-export.json`）；
+  平台管理员可切换「导出明文」并二次确认。
+- 「离户」danger 按钮仅平台管理员可见（ACTIVE/SUSPENDED），需填写原因并输入租户 code，调用
+  `POST /api/tenants/{id}/offboard`，成功后返回租户列表。
+
+## v10 企业登录 / 租户切换 / 平台管理 / 工作流
+
+- 登录页移除预置账号卡片：账号密码 + 可选租户代码；`tenantSelectionRequired` 时展示租户选择；
+  SSO 按钮通过 `GET /api/auth/oidc/providers` 按启用 Provider 渲染。
+- 顶栏租户切换器：`GET /api/auth/tenants` 多条时显示，切换调用 `POST /api/auth/switch-tenant` 并刷新。
+- 平台管理：平台用户页（列表/新建/编辑/启停/重置密码）、SSO 配置页（Provider CRUD/启停/测试/公开入口）、
+  MCP 凭据与调用审计入口。
+- 工作流页：租户生命周期阶段 + 活动 + Skill/Agent + 产出；优先 `/api/workflows/tenant-lifecycle`，失败/空数据回退内置模板。
+- MCP 导航置顶；页面顶部提供获取配置 / API Keys / 调用审计 / 外部 MCP 服务器（右侧抽屉）入口。
+
 ## 工程约定
 
 - `src/api/client.ts`：统一 fetch 封装，解析 `{code,message,data}`，`code !== 0` 抛 `ApiError`；

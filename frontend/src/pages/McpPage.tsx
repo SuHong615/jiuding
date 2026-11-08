@@ -15,7 +15,7 @@
  *
  * @author suhong
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   DEFAULT_MCP_KEY,
   errorMessage,
@@ -42,6 +42,7 @@ import { useAuth } from '../auth/AuthContext'
 import { AsyncBlock, ErrorBlock, LoadingBlock } from '../components/PageState'
 import { Badge } from '../components/Badge'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { Drawer } from '../components/Drawer'
 import { Field, SectionCard } from '../components/Forms'
 import { Icon } from '../components/Icon'
 import { JsonView } from '../components/JsonView'
@@ -97,10 +98,28 @@ function extractTools(payload: unknown): McpTool[] {
   return []
 }
 
-export function McpPage() {
+export function McpPage({ focus }: { focus?: 'keys' | 'audits' }) {
   const toast = useToast()
   const [apiKey, setApiKeyState] = useState(() => getMcpApiKey())
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [externalDrawerOpen, setExternalDrawerOpen] = useState(false)
+
+  const scrollToSection = (title: string) => {
+    const heading = [...document.querySelectorAll('.card-head h3')].find(
+      (element) => element.textContent?.trim() === title,
+    )
+    const card = heading?.closest('.card')
+    card?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  useEffect(() => {
+    if (!focus) return
+    const timer = window.setTimeout(
+      () => scrollToSection(focus === 'keys' ? '我的 API Key' : '调用审计'),
+      500,
+    )
+    return () => window.clearTimeout(timer)
+  }, [focus])
 
   const info = useAsync<McpInfo>(async () => {
     const raw = await mcpInfo({ apiKey: apiKey.trim() || DEFAULT_MCP_KEY })
@@ -404,6 +423,18 @@ export function McpPage() {
             <Icon name="key" size={15} />
             获取 MCP
           </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => scrollToSection('我的 API Key')}>
+            我的 API Keys
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => scrollToSection('调用审计')}>
+            调用审计
+          </button>
+          {isPlatformAdmin ? (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setExternalDrawerOpen(true)}>
+              <Icon name="server" size={15} />
+              外部 MCP 服务器
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -645,6 +676,18 @@ export function McpPage() {
       </SectionCard>
 
       {isPlatformAdmin ? (
+        <Drawer
+          open={externalDrawerOpen}
+          title="外部 MCP 服务器"
+          subtitle="右侧抽屉配置：注册外部 MCP 服务并做连通性检查（Streamable HTTP / SSE）"
+          width={860}
+          onClose={() => setExternalDrawerOpen(false)}
+          footer={
+            <button type="button" className="btn btn-ghost" onClick={() => setExternalDrawerOpen(false)}>
+              关闭
+            </button>
+          }
+        >
         <SectionCard
           title="外部 MCP 服务器"
           description="平台管理员可注册外部 MCP 服务器并做连通性检查（Streamable HTTP / SSE）"
@@ -728,6 +771,7 @@ export function McpPage() {
             </div>
           </AsyncBlock>
         </SectionCard>
+        </Drawer>
       ) : null}
 
       <SectionCard

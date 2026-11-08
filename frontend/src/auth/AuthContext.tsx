@@ -34,6 +34,7 @@ interface AuthContextValue {
   login: (username: string, password: string, tenantCode?: string) => Promise<Principal>
   applyLogin: (result: LoginResult) => void
   loginWithToken: (token: string) => Promise<Principal>
+  switchTenant: (tenantCode: string) => Promise<Principal>
   logout: () => void
   hasRole: (...roles: string[]) => boolean
   hasPermission: (permission: string) => boolean
@@ -99,8 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // SSO 回调：先写入 token，再通过 /api/auth/me 拉取 principal
-  const loginWithToken = useCallback(async (token: string) => {
-    try {
+  const loginWithToken = useCallback(async (token: string) => {    try {
       localStorage.setItem(TOKEN_KEY, token)
     } catch {
       /* localStorage 不可用时忽略 */
@@ -119,6 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw err
     }
   }, [])
+
+  // v10：顶栏租户切换；服务端用当前账号凭据换发目标租户 JWT
+  const switchTenant = useCallback(
+    async (tenantCode: string) => {
+      const result = await api.post<LoginResult>('/api/auth/switch-tenant', { tenantCode })
+      applyLogin(result)
+      return result.principal
+    },
+    [applyLogin],
+  )
 
   const logout = useCallback(() => {
     clearAuthStorage()
@@ -166,13 +176,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       applyLogin,
       loginWithToken,
+      switchTenant,
       logout,
       hasRole,
       hasPermission,
       isPlatformAdmin: Boolean(principal?.roles?.includes('PLATFORM_ADMIN')),
       updatePrincipal,
     }),
-    [token, principal, mePermissions, login, applyLogin, loginWithToken, logout, hasRole, hasPermission, updatePrincipal],
+    [token, principal, mePermissions, login, applyLogin, loginWithToken, switchTenant, logout, hasRole, hasPermission, updatePrincipal],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

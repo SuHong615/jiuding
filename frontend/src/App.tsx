@@ -37,6 +37,9 @@ import { PermissionsPage } from './pages/PermissionsPage'
 import { SsoCallbackPage } from './pages/SsoCallbackPage'
 import { SecurityMfaPage } from './pages/SecurityMfaPage'
 import { ScimPage } from './pages/ScimPage'
+import { PlatformUsersPage } from './pages/PlatformUsersPage'
+import { WorkflowsPage } from './pages/WorkflowsPage'
+import { SsoProvidersPage } from './pages/SsoProvidersPage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { token } = useAuth()
@@ -98,7 +101,12 @@ export function App() {
         <Route path="agents" element={<AgentsPage />} />
         <Route path="agents/:runId" element={<AgentRunDetailPage />} />
         <Route path="mcp" element={<McpPage />} />
+        <Route path="mcp/keys" element={<McpPage focus="keys" />} />
+        <Route path="mcp/audits" element={<McpPage focus="audits" />} />
+        <Route path="workflows" element={<WorkflowsPage />} />
         <Route path="permissions" element={<PermissionsPage />} />
+        <Route path="platform/users" element={<PlatformUsersPage />} />
+        <Route path="platform/sso" element={<SsoProvidersPage />} />
         <Route path="security/mfa" element={<SecurityMfaPage />} />
         <Route path="scim" element={<ScimPage />} />
         <Route path="*" element={<NotFoundPage />} />

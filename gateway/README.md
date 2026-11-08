@@ -32,6 +32,7 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 | `TENANCY_OIDC_FRONTEND_REDIRECT` | `http://localhost:30088/sso-callback` | 登录完成后前端重定向（token 放 fragment） |
 | `TENANCY_OIDC_STATE_SECRET` / `TENANCY_OIDC_STATE_TTL_SECONDS` | 共享 JWT secret / `600` | state HMAC 密钥与有效期 |
 | `TENANCY_OIDC_DISCOVERY_CACHE_SECONDS` / `TENANCY_OIDC_REQUEST_TIMEOUT_MS` | `300` / `5000` | 发现文档缓存 / IdP 请求超时 |
+| `TENANCY_OIDC_PROVIDERS_CACHE_SECONDS` | `60` | 动态 SSO Provider 列表（tenant-service `/internal/sso-providers/enabled`）缓存秒数；v10 起优先于环境变量静态配置 |
 | `TENANT_SERVICE_URL` | `http://localhost:8081` | 租户服务 |
 | `APPROVAL_SERVICE_URL` | `http://localhost:8082` | 审批服务 |
 | `AGENT_SERVICE_URL` | `http://localhost:8083` | Agent/Skill 服务 |
@@ -50,6 +51,8 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 |---|---|---|
 | POST | `/api/auth/login` | 双通道登录（docs/13 §2）：`{username,password,tenantCode?}`；`tenantCode` 空 → 平台预置用户优先，未命中则走租户账号认证；非空 → 直接租户账号认证（调 tenant-service `POST /internal/auth/authenticate`，带 `X-Internal-Token`）。成功返回 JWT（`tid` + `oid` claim）与 principal（含 `orgUnitId/mustChangePassword/authType=PLATFORM|TENANT`） |
 | GET | `/api/auth/me` | 当前 principal（含 `orgUnitId`、`authType`；`mustChangePassword` 仅登录响应返回，JWT 无此 claim） |
+| GET | `/api/auth/tenants` | v10 当前身份可切换租户（JWT；`username`+密码哈希匹配的 ACTIVE 租户成员关系） |
+| POST | `/api/auth/switch-tenant` | v10 `{tenantCode}` → 内部校验后签发目标租户 JWT（保留 roles/orgUnitId） |
 | GET | `/api/platform/overview` | 租户/审批/技能/Agent 聚合（单服务失败降级） |
 | GET | `/api/platform/health` | 4 个下游 `/actuator/health` 探测 |
 | * | `/api/tenants/**` | → tenant-service |
@@ -61,15 +64,39 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 | * | `/api/public/**` | → tenant-service（v5 公开自助入驻，白名单免认证） |
 | * | `/scim/v2/**` | → tenant-service（v6 SCIM 2.0；`Authorization: Bearer scim_...` 由下游校验，网关白名单透传） |
 | * | `/api/platform/scim-tokens/**` | → tenant-service（v6 平台 SCIM Token 管理，需平台管理员 JWT） |
+| * | `/api/platform/users`、`/api/platform/users/**` | → tenant-service（v10 平台账号管理，需平台管理员 JWT） |
+| * | `/api/platform/sso-providers`、`/api/platform/sso-providers/**` | → tenant-service（v10 SSO Provider 配置管理） |
+| * | `/api/workflows`、`/api/workflows/**` | → tenant-service（v10 租户生命周期工作流只读视图） |
 | GET | `/api/auth/oidc/status` | v6 OIDC：`{enabled, providerName, loginUrl}`（白名单） |
 | GET | `/api/auth/oidc/authorize` | v6 OIDC：返回 `{authorizationUrl}`（`?redirect=true` 时 302 到 IdP），含签名 state + PKCE S256 |
 | GET | `/api/auth/oidc/callback` | v6 OIDC：校验 state → 换 token → userinfo → 签发 JWT → 302 到前端 `#token=...&username=...`；失败 `#error=...` |
+| GET | `/api/auth/oidc/providers` | v10 公开的启用 SSO Provider 列表（`[{code,name,loginUrl}]`，`authorize?provider=<code>` 选择） |
 
 认证由 `tenancy-common` 的 `AuthFilter` 统一处理；`/api/auth/login`、`/actuator/health`、`/api/public/**`、`/scim/**` 在白名单。
 代理透传 `Authorization`、`X-Tenant-Id`、`X-Request-Id`、`X-API-Key` 及 `Content-Type`；
 下游不可达返回 `502` + `ApiResponse{code:50200}`，不抛 500。
 登录错误统一为 `401 {code:40100,message:"invalid credentials"}`（不区分用户名/密码/租户）；
 租户认证时 tenant-service 不可达或返回 5xx → `503 {code:50200}`（`GatewayExceptionHandler`）。
+
+## 平台账号与多租户（v10，docs/20 §3）
+
+- 平台账号登录优先调用 tenant-service `POST /internal/platform-users/authenticate`（X-Internal-Token，PBKDF2 在租户侧校验）；
+  下游不可用/账号不存在时回退到本地预置用户目录（仅兼容，任何 API 都不暴露预置列表）。
+- `tenantCode` 为空：平台账号 → 本地预置 → 租户成员解析；同一 username+密码命中多个租户时返回
+  `200 {mfaRequired:false, tenantSelectionRequired:true, tenants:[{tenantId,tenantCode,name}]}`；显式 `tenantCode` 直接走租户认证。
+- `/api/auth/tenants` 使用当前 JWT 身份查询可切换租户：平台账号/无租户身份返回 `[]`；租户账号优先调用
+  `GET /internal/auth/tenants?username=&userId=&currentTenantId=`，当前 tenant-service v10 尚未提供该接口时降级为「当前租户」单条（不返回 502）。
+- `/api/auth/switch-tenant {tenantCode, password?}` 调用 tenant-service
+  `POST /internal/auth/switch-tenant`（实际契约 `{username,tenantCode,password}`，网关额外携带 `userId/currentTenantId` 以容忍未来实现）；
+  账号 username 由登录时的内存映射还原（JWT 只有 accountId+displayName）；未提供 password 时由 tenant-service 判定（当前实现要求 password）。
+
+## 动态 SSO Provider（v10，docs/20 §3）
+
+- 启动/首次请求从 tenant-service `GET /internal/sso-providers/enabled`（X-Internal-Token）读取启用 IdP，缓存 60s
+  （`TENANCY_OIDC_PROVIDERS_CACHE_SECONDS`）；失败降级为无动态 Provider（不拖垮静态 `tenancy.auth.oidc.*` 配置）。
+- `GET /api/auth/oidc/providers` 返回 `[{code,name,loginUrl}]`（不含 secret）；`authorize?provider=<code>` 选择 Provider，
+  provider code 绑定进签名 state，callback 使用对应 issuer/client/secret/frontendRedirect；未知 provider → 404；多个 Provider
+  未指定 code → 400/404 明确提示。未启用任何 Provider 时保持 v6 disabled 行为。
 
 ## OIDC / SSO（v6，docs/16 §2）
 

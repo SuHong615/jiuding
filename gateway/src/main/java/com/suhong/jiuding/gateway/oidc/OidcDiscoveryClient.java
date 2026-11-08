@@ -30,11 +30,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Resolves the OIDC provider endpoints from
- * {@code ${issuer}/.well-known/openid-configuration} with a 5-minute in-memory cache
- * (docs/16 §2). Explicitly configured endpoints take precedence over discovery.
+ * Resolves OIDC provider endpoints from
+ * {@code ${issuer}/.well-known/openid-configuration} with a 5-minute in-memory cache keyed
+ * by issuer (docs/16 §2, docs/20 §3 — one cache entry per dynamic SSO provider).
+ * Explicitly configured endpoints take precedence over discovery.
  */
 @Service
 public class OidcDiscoveryClient {
@@ -44,8 +47,7 @@ public class OidcDiscoveryClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final OidcProperties properties;
-
-    private volatile CachedEndpoints cached;
+    private final Map<String, CachedEndpoints> cache = new ConcurrentHashMap<>();
 
     public OidcDiscoveryClient(HttpClient httpClient, ObjectMapper objectMapper, OidcProperties properties) {
         this.httpClient = httpClient;
@@ -53,39 +55,50 @@ public class OidcDiscoveryClient {
         this.properties = properties;
     }
 
+    /** Endpoints of the legacy env-configured provider ({@code tenancy.auth.oidc.*}). */
     public Endpoints endpoints() {
-        if (hasAllExplicitEndpoints()) {
-            return new Endpoints(properties.getAuthorizationEndpoint(), properties.getTokenEndpoint(),
-                    properties.getUserinfoEndpoint());
+        return endpoints(properties.getIssuer(), properties.getAuthorizationEndpoint(),
+                properties.getTokenEndpoint(), properties.getUserinfoEndpoint());
+    }
+
+    /**
+     * @param issuer      provider issuer base URL
+     * @param auth        explicit authorization endpoint (optional)
+     * @param token       explicit token endpoint (optional)
+     * @param userinfo    explicit userinfo endpoint (optional)
+     */
+    public Endpoints endpoints(String issuer, String auth, String token, String userinfo) {
+        if (hasAllExplicitEndpoints(auth, token, userinfo)) {
+            return new Endpoints(auth, token, userinfo);
         }
+        if (issuer == null || issuer.isBlank()) {
+            throw new OidcException("oidc_discovery_failed", "OIDC issuer is not configured");
+        }
+        String key = trimSlash(issuer);
         long now = System.currentTimeMillis();
         long ttlMs = Math.max(1L, properties.getDiscoveryCacheSeconds()) * 1000L;
-        CachedEndpoints current = cached;
+        CachedEndpoints current = cache.get(key);
         if (current != null && now - current.fetchedAt() < ttlMs) {
             return current.endpoints();
         }
         synchronized (this) {
-            current = cached;
+            current = cache.get(key);
             now = System.currentTimeMillis();
             if (current != null && now - current.fetchedAt() < ttlMs) {
                 return current.endpoints();
             }
-            Endpoints fetched = fetch();
-            cached = new CachedEndpoints(fetched, now);
+            Endpoints fetched = fetch(issuer);
+            cache.put(key, new CachedEndpoints(fetched, now));
             return fetched;
         }
     }
 
     /** Visible for tests: clears the discovery cache. */
     public void invalidateCache() {
-        cached = null;
+        cache.clear();
     }
 
-    private Endpoints fetch() {
-        String issuer = properties.getIssuer();
-        if (issuer == null || issuer.isBlank()) {
-            throw new OidcException("oidc_discovery_failed", "OIDC issuer is not configured");
-        }
+    private Endpoints fetch(String issuer) {
         String discoveryUrl = trimSlash(issuer) + "/.well-known/openid-configuration";
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(discoveryUrl))
@@ -119,10 +132,8 @@ public class OidcDiscoveryClient {
         }
     }
 
-    private boolean hasAllExplicitEndpoints() {
-        return hasText(properties.getAuthorizationEndpoint())
-                && hasText(properties.getTokenEndpoint())
-                && hasText(properties.getUserinfoEndpoint());
+    private static boolean hasAllExplicitEndpoints(String auth, String token, String userinfo) {
+        return hasText(auth) && hasText(token) && hasText(userinfo);
     }
 
     private static String text(JsonNode node, String field) {

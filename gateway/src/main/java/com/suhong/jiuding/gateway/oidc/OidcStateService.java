@@ -56,8 +56,13 @@ public class OidcStateService {
         this.properties = properties;
     }
 
-    /** Issues a new state + PKCE pair for one authorization request. */
+    /** Issues a new state + PKCE pair for one authorization request (legacy static provider). */
     public AuthorizationRequest newAuthorizationRequest() {
+        return newAuthorizationRequest(null);
+    }
+
+    /** Issues a new state + PKCE pair bound to a dynamic provider code (docs/20 §3). */
+    public AuthorizationRequest newAuthorizationRequest(String providerCode) {
         purgeExpired();
         String nonce = randomToken(NONCE_BYTES);
         long issuedAt = Instant.now().toEpochMilli();
@@ -65,7 +70,7 @@ public class OidcStateService {
         String state = nonce + "." + issuedAt + "." + signature;
         String verifier = randomToken(VERIFIER_BYTES);
         String challenge = base64Url(sha256(verifier));
-        sessions.put(state, new PkceSession(verifier, issuedAt));
+        sessions.put(state, new PkceSession(verifier, issuedAt, providerCode));
         return new AuthorizationRequest(state, challenge, verifier);
     }
 
@@ -156,7 +161,7 @@ public class OidcStateService {
     public record AuthorizationRequest(String state, String codeChallenge, String codeVerifier) {
     }
 
-    /** Server-side PKCE session bound to a signed state. */
-    public record PkceSession(String codeVerifier, long issuedAt) {
+    /** Server-side PKCE session bound to a signed state (and optional dynamic provider code). */
+    public record PkceSession(String codeVerifier, long issuedAt, String providerCode) {
     }
 }

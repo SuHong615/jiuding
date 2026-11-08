@@ -74,4 +74,19 @@ public class AuthController {
     public ApiResponse<PrincipalView> me() {
         return ApiResponse.ok(authService.currentPrincipal());
     }
+
+    /** Tenants the current identity can switch to (docs/20 §3). Requires a bearer token. */
+    @GetMapping("/tenants")
+    public ApiResponse<java.util.List<TenantSummary>> tenants() {
+        return ApiResponse.ok(authService.switchableTenants());
+    }
+
+    /**
+     * Re-issues a JWT for another tenant membership of the same identity (docs/20 §3).
+     * Requires a bearer token; the membership is validated by tenant-service.
+     */
+    @PostMapping("/switch-tenant")
+    public ApiResponse<LoginResponse> switchTenant(@Valid @RequestBody SwitchTenantRequest request) {
+        return ApiResponse.ok(authService.switchTenant(request.tenantCode(), request.password()));
+    }
 }

@@ -121,4 +121,25 @@ public class ProxyController {
         proxyService.forward(request, response, new ServiceRoute(
                 "tenant-service", properties.getTenantServiceUrl(), properties.getRequestTimeoutMs()));
     }
+
+    /** v10 platform account management (docs/20 §3): tenant-service enforces platform admin. */
+    @RequestMapping({"/api/platform/users", "/api/platform/users/**"})
+    public void proxyPlatformUsers(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        proxyService.forward(request, response, new ServiceRoute(
+                "tenant-service", properties.getTenantServiceUrl(), properties.getRequestTimeoutMs()));
+    }
+
+    /** v10 SSO provider management (docs/20 §3): tenant-service enforces platform admin. */
+    @RequestMapping({"/api/platform/sso-providers", "/api/platform/sso-providers/**"})
+    public void proxySsoProviders(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        proxyService.forward(request, response, new ServiceRoute(
+                "tenant-service", properties.getTenantServiceUrl(), properties.getRequestTimeoutMs()));
+    }
+
+    /** v10 tenant lifecycle workflow view (docs/20 §4.5): read-only aggregation in tenant-service. */
+    @RequestMapping({"/api/workflows", "/api/workflows/**"})
+    public void proxyWorkflows(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        proxyService.forward(request, response, new ServiceRoute(
+                "tenant-service", properties.getTenantServiceUrl(), properties.getRequestTimeoutMs()));
+    }
 }

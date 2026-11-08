@@ -15,10 +15,14 @@
  *
  * @author suhong
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { api, errorMessage } from '../api/client'
+import type { AuthTenantOption } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { Icon, type IconName } from '../components/Icon'
+import { useToast } from '../components/Toast'
+import { useAsync } from '../hooks/useAsync'
 import { roleLabel } from '../utils/labels'
 
 interface NavItem {
@@ -34,17 +38,46 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/tenants', label: '租户管理', icon: 'tenants', group: '运营', keywords: ['TENANT', 'ORG', 'ACCOUNT'] },
   { path: '/collection', label: '租户采集', icon: 'collection', group: '运营', keywords: ['TENANT', 'COLLECT'] },
   { path: '/approvals', label: '审批中心', icon: 'approvals', group: '运营', keywords: ['APPROVAL'] },
+  { path: '/mcp', label: 'MCP 控制台', icon: 'mcp', group: '能力', keywords: ['MCP'] },
+  { path: '/workflows', label: '工作流', icon: 'collection', group: '能力', keywords: ['WORKFLOW', 'TENANT'] },
   { path: '/skills', label: '技能中心', icon: 'skills', group: '能力', keywords: ['SKILL'] },
   { path: '/agents', label: 'Agent 运行', icon: 'agents', group: '能力', keywords: ['AGENT'] },
-  { path: '/mcp', label: 'MCP 控制台', icon: 'mcp', group: '能力', keywords: ['MCP'] },
   { path: '/permissions', label: '权限管理', icon: 'shield', group: '平台', keywords: ['RBAC', 'ROLE', 'PERMISSION'] },
+  { path: '/platform/users', label: '平台用户', icon: 'user', group: '平台', keywords: ['PLATFORM_USER', 'USER'] },
+  { path: '/platform/sso', label: 'SSO 配置', icon: 'key', group: '平台', keywords: ['SSO', 'OIDC'] },
   { path: '/scim', label: 'SCIM 配置', icon: 'key', group: '平台', keywords: ['SCIM'] },
+  { path: '/mcp/keys', label: 'MCP 凭据', icon: 'key', group: '平台', keywords: ['MCP', 'KEY'] },
+  { path: '/mcp/audits', label: 'MCP 调用审计', icon: 'file', group: '平台', keywords: ['MCP', 'AUDIT'] },
 ]
 
 export function Layout() {
-  const { principal, logout, mePermissions, isPlatformAdmin } = useAuth()
+  const { token, principal, logout, mePermissions, isPlatformAdmin, switchTenant } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const toast = useToast()
+
+  const tenants = useAsync(async () => {
+    if (!token) return []
+    const result = await api.get<AuthTenantOption[] | { tenants?: AuthTenantOption[] }>('/api/auth/tenants')
+    return Array.isArray(result) ? result : (result?.tenants ?? [])
+  }, [token])
+  const tenantOptions = tenants.data ?? []
+  const [switchingTenant, setSwitchingTenant] = useState(false)
+  const currentTenantCode =
+    tenantOptions.find((tenant) => tenant.tenantId === principal?.tenantId)?.tenantCode ?? ''
+
+  const handleSwitchTenant = async (tenantCode: string) => {
+    if (!tenantCode) return
+    setSwitchingTenant(true)
+    try {
+      await switchTenant(tenantCode)
+      toast.success('租户已切换')
+      window.location.assign('/')
+    } catch (err) {
+      toast.error(errorMessage(err))
+      setSwitchingTenant(false)
+    }
+  }
 
   const canSeeNav = (item: NavItem): boolean => {
     if (item.path === '/permissions') {
@@ -58,6 +91,13 @@ export function Layout() {
       if (!mePermissions) return false
       if (mePermissions.includes('*')) return true
       return mePermissions.some((code) => /SCIM/i.test(code))
+    }
+    if (item.path.startsWith('/platform/') || item.path === '/mcp/keys' || item.path === '/mcp/audits') {
+      if (isPlatformAdmin) return true
+      if (!mePermissions) return false
+      if (mePermissions.includes('*')) return true
+      const keywords = item.keywords ?? []
+      return keywords.some((keyword) => mePermissions.some((code) => code.toUpperCase().includes(keyword)))
     }
     // 无 /api/me/permissions 依据时回退角色判断：默认展示（后端仍强制校验）
     if (!mePermissions || !mePermissions.length) return true
@@ -140,6 +180,22 @@ export function Layout() {
             <strong>{active.label}</strong>
           </nav>
           <div className="topbar-actions">
+            {tenantOptions.length > 1 ? (
+              <select
+                className="select select-compact tenant-switcher"
+                value={currentTenantCode}
+                disabled={switchingTenant}
+                title="切换当前租户"
+                onChange={(event) => handleSwitchTenant(event.target.value)}
+              >
+                <option value="">切换租户</option>
+                {tenantOptions.map((tenant) => (
+                  <option key={tenant.tenantCode} value={tenant.tenantCode}>
+                    {tenant.name || tenant.tenantCode}（{tenant.tenantCode}）
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <span className="context-chip" title={`当前角色：${roleText}`}>
               <Icon name="user" size={13} />
               {roleText}

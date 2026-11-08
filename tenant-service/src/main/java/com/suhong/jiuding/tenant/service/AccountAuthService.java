@@ -21,6 +21,7 @@ import com.suhong.jiuding.common.error.BizException;
 import com.suhong.jiuding.common.error.ErrorCode;
 import com.suhong.jiuding.tenant.api.AuthenticateRequest;
 import com.suhong.jiuding.tenant.api.AuthenticateResponse;
+import com.suhong.jiuding.tenant.api.SwitchTenantRequest;
 import com.suhong.jiuding.tenant.domain.AccountStatus;
 import com.suhong.jiuding.tenant.domain.TenantStatus;
 import com.suhong.jiuding.tenant.mfa.MfaAuthenticateRequest;
@@ -39,8 +40,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -101,11 +105,16 @@ public class AccountAuthService {
         String tenantCode = Texts.blankToNull(request == null ? null : request.tenantCode());
         String username = passwordHasher.normalizeUsername(request == null ? null : request.username());
         String password = request == null ? null : request.password();
-        if (tenantCode == null || username == null || username.isBlank() || password == null || password.isEmpty()) {
+        if (username == null || username.isBlank() || password == null || password.isEmpty()) {
             throw invalidCredentials();
         }
         String safeIp = Texts.truncate(Texts.blankToNull(ip), 64);
         String safeUa = Texts.truncate(Texts.blankToNull(userAgent), 256);
+        if (tenantCode == null) {
+            // docs/20 section 3: username-only login resolves the tenant by username + password
+            // and asks the caller to choose when several ACTIVE tenants match.
+            return authenticateMultiTenant(username, password, safeIp, safeUa);
+        }
 
         TenantRow tenant = tenants.findByCode(tenantCode).orElse(null);
         if (tenant == null) {
@@ -140,15 +149,80 @@ public class AccountAuthService {
             recordFailure(tenant, account, safeIp, safeUa);
             throw invalidCredentials();
         }
+        return finalizeLogin(tenant, account, safeIp, safeUa);
+    }
 
+    /**
+     * Switch to another tenant of the same person (docs/20 section 3): the target tenant must
+     * contain the same username with the same password; MFA stays enabled for the new tenant.
+     */
+    public AuthenticateResponse switchTenant(SwitchTenantRequest request, String ip, String userAgent) {
+        String tenantCode = Texts.blankToNull(request == null ? null : request.tenantCode());
+        String username = passwordHasher.normalizeUsername(request == null ? null : request.username());
+        String password = request == null ? null : request.password();
+        if (tenantCode == null || username == null || username.isBlank()
+                || password == null || password.isEmpty()) {
+            throw invalidCredentials();
+        }
+        String safeIp = Texts.truncate(Texts.blankToNull(ip), 64);
+        String safeUa = Texts.truncate(Texts.blankToNull(userAgent), 256);
+        TenantRow tenant = tenants.findByCode(tenantCode).orElse(null);
+        if (tenant == null || tenant.deletedAt() != null
+                || !TenantStatus.ACTIVE.name().equals(tenant.status())) {
+            throw invalidCredentials();
+        }
+        AccountRow account = accounts.findByUsername(tenant.id(), username).orElse(null);
+        if (account == null || account.deletedAt() != null
+                || !AccountStatus.ACTIVE.name().equals(account.status())) {
+            passwordHasher.matches(password, DUMMY_HASH, DUMMY_SALT);
+            throw invalidCredentials();
+        }
+        if (!passwordHasher.matches(password, account.passwordHash(), account.passwordSalt())) {
+            throw invalidCredentials();
+        }
+        return finalizeLogin(tenant, account, safeIp, safeUa);
+    }
+
+    private AuthenticateResponse authenticateMultiTenant(String username, String password,
+                                                         String ip, String userAgent) {
+        List<MatchedAccount> matches = new ArrayList<>();
+        for (TenantRow tenant : tenants.findActive(1000)) {
+            AccountRow account = accounts.findByUsername(tenant.id(), username).orElse(null);
+            if (account == null || account.deletedAt() != null
+                    || !AccountStatus.ACTIVE.name().equals(account.status())) {
+                continue;
+            }
+            if (passwordHasher.matches(password, account.passwordHash(), account.passwordSalt())) {
+                matches.add(new MatchedAccount(tenant, account));
+            }
+        }
+        if (matches.isEmpty()) {
+            passwordHasher.matches(password, DUMMY_HASH, DUMMY_SALT);
+            throw invalidCredentials();
+        }
+        if (matches.size() == 1) {
+            MatchedAccount match = matches.get(0);
+            return finalizeLogin(match.tenant(), match.account(), ip, userAgent);
+        }
+        List<AuthenticateResponse.TenantChoice> choices = matches.stream()
+                .map(match -> new AuthenticateResponse.TenantChoice(
+                        match.tenant().id(), match.tenant().tenantCode(), match.tenant().name()))
+                .sorted(Comparator.comparing(AuthenticateResponse.TenantChoice::tenantCode))
+                .toList();
+        log.info("username-only login for {} matched {} tenants, selection required",
+                username, choices.size());
+        return AuthenticateResponse.tenantSelection(username, choices);
+    }
+
+    private AuthenticateResponse finalizeLogin(TenantRow tenant, AccountRow account,
+                                               String ip, String userAgent) {
         // docs/16 section 3: a correct password with MFA enabled only yields a short lived
         // challenge token; the full principal is released after the second factor.
         if (mfaService.isEnabled(account.id())) {
             String challengeToken = mfaService.createChallenge(tenant, account);
             return AuthenticateResponse.mfaChallenge(tenant.tenantCode(), account.username(), challengeToken);
         }
-
-        recordSuccess(tenant, account, safeIp, safeUa);
+        recordSuccess(tenant, account, ip, userAgent);
         return principalResponse(tenant, account);
     }
 
@@ -162,8 +236,7 @@ public class AccountAuthService {
         return principalResponse(result.tenant(), result.account());
     }
 
-    private AuthenticateResponse principalResponse(TenantRow tenant, AccountRow account) {
-        String orgUnitPath = account.orgUnitId() == null ? null
+    private AuthenticateResponse principalResponse(TenantRow tenant, AccountRow account) {        String orgUnitPath = account.orgUnitId() == null ? null
                 : orgUnits.findById(tenant.id(), account.orgUnitId())
                         .map(OrgUnitRow::path)
                         .orElse(null);
@@ -236,5 +309,9 @@ public class AccountAuthService {
 
     private BizException invalidCredentials() {
         return new BizException(ErrorCode.UNAUTHORIZED, INVALID_CREDENTIALS);
+    }
+
+    /** One tenant/account pair whose username+password matched during multi-tenant login. */
+    private record MatchedAccount(TenantRow tenant, AccountRow account) {
     }
 }

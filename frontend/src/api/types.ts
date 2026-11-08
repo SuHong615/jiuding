@@ -54,6 +54,21 @@ export interface LoginResult {
   mfaRequired?: boolean
   challengeToken?: string
   username?: string
+  // docs/20：无 tenantCode 时多租户匹配返回租户选择列表
+  tenantSelectionRequired?: boolean
+  tenants?: AuthTenantOption[]
+}
+
+export interface AuthTenantOption {
+  tenantId?: string
+  tenantCode: string
+  name?: string
+}
+
+export interface OidcProvider {
+  code: string
+  name: string
+  loginUrl?: string | null
 }
 
 export interface LoginMfaRequest {
@@ -109,6 +124,93 @@ export interface ScimTokenCreateResult {
   tenantId?: string
   name?: string
   createdAt?: string | null
+}
+
+/* ------------------------------ v10：平台账号 / SSO Provider / 工作流（docs/20） ------------------------------ */
+
+export interface PlatformUserView {
+  id: string
+  username: string
+  displayName?: string | null
+  email?: string | null
+  roles: string[]
+  status: string
+  lastLoginAt?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface PlatformUserCreateRequest {
+  username: string
+  displayName?: string
+  email?: string
+  roles: string[]
+  password: string
+}
+
+export interface PlatformUserUpdateRequest {
+  displayName?: string
+  email?: string
+  roles?: string[]
+  status?: string
+}
+
+export interface PlatformUserResetResult {
+  tempPassword?: string | null
+}
+
+export interface SsoProviderView {
+  id: string
+  code: string
+  name: string
+  issuer?: string | null
+  clientId?: string | null
+  clientSecret?: string | null
+  scopes?: string | null
+  redirectUri?: string | null
+  frontendRedirect?: string | null
+  roleClaim?: string | null
+  defaultRole?: string | null
+  enabled?: boolean
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface SsoProviderPayload {
+  code: string
+  name: string
+  issuer?: string
+  clientId?: string
+  clientSecret?: string
+  scopes?: string
+  redirectUri?: string
+  frontendRedirect?: string
+  roleClaim?: string
+  defaultRole?: string
+  enabled?: boolean
+}
+
+export interface SsoProviderTestResult {
+  ok?: boolean
+  status?: string
+  message?: string
+  authorizationEndpoint?: string
+  issuer?: string
+}
+
+export interface WorkflowStageView {
+  stage: string
+  label: string
+  description?: string | null
+  activities?: string[]
+  skills?: string[]
+  agents?: string[]
+  outputs?: string[]
+}
+
+export interface WorkflowLifecycleView {
+  stages?: WorkflowStageView[]
+  updatedAt?: string | null
 }
 
 /** 列表分页：兼容 Spring Page（content/totalElements）与 docs/11 的 {items,total,page,size} */

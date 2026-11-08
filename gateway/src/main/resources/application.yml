@@ -99,6 +99,8 @@ tenancy:
       state-secret: ${TENANCY_OIDC_STATE_SECRET:${TENANCY_SECURITY_JWT_SECRET:tenancy-center-dev-secret-change-me-please}}
       state-ttl-seconds: ${TENANCY_OIDC_STATE_TTL_SECONDS:600}
       discovery-cache-seconds: ${TENANCY_OIDC_DISCOVERY_CACHE_SECONDS:300}
+      # Dynamic providers loaded from tenant-service /internal/sso-providers/enabled (docs/20 §3).
+      providers-cache-seconds: ${TENANCY_OIDC_PROVIDERS_CACHE_SECONDS:60}
       request-timeout-ms: ${TENANCY_OIDC_REQUEST_TIMEOUT_MS:5000}
   gateway:
     tenant-service-url: ${TENANT_SERVICE_URL:http://localhost:8081}

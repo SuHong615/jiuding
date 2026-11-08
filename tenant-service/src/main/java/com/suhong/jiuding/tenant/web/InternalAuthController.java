@@ -20,6 +20,7 @@ package com.suhong.jiuding.tenant.web;
 import com.suhong.jiuding.common.api.ApiResponse;
 import com.suhong.jiuding.tenant.api.AuthenticateRequest;
 import com.suhong.jiuding.tenant.api.AuthenticateResponse;
+import com.suhong.jiuding.tenant.api.SwitchTenantRequest;
 import com.suhong.jiuding.tenant.mfa.MfaAuthenticateRequest;
 import com.suhong.jiuding.tenant.service.AccountAuthService;
 import com.suhong.jiuding.tenant.support.Texts;
@@ -66,6 +67,18 @@ public class InternalAuthController {
     public ApiResponse<AuthenticateResponse> authenticateMfa(@Valid @RequestBody MfaAuthenticateRequest request,
                                                              HttpServletRequest httpRequest) {
         return ApiResponses.ok(accountAuthService.authenticateMfa(request,
+                clientIp(httpRequest), userAgent(httpRequest)));
+    }
+
+    /**
+     * Tenant switch for a signed-in account (docs/20 section 3): validates that the target
+     * tenant has the same username + password hash and returns the target tenant principal
+     * (or the MFA challenge when the target account has MFA enabled).
+     */
+    @PostMapping("/switch-tenant")
+    public ApiResponse<AuthenticateResponse> switchTenant(@RequestBody SwitchTenantRequest request,
+                                                          HttpServletRequest httpRequest) {
+        return ApiResponses.ok(accountAuthService.switchTenant(request,
                 clientIp(httpRequest), userAgent(httpRequest)));
     }
 
