@@ -27,6 +27,8 @@
 
 ### Security
 - 默认密钥仅用于本地演示，禁止用于生产；部署时必须覆盖 `TENANCY_SECURITY_JWT_SECRET`、`TENANCY_INTERNAL_TOKEN`、`TENANCY_SECURITY_API_KEYS`、数据库口令与 `MCP_DB_PASSWORD`
+- K8s 改为 `gen-secrets.sh` 随机生成 Secret；`01-secrets.yaml` 仅保留 `CHANGE_ME_*` 模板
+- 新增 `scripts/scan-secrets.ps1` 与 CI secret-scan；补充演示凭据清单（`SECURITY.md`）
 
 ### Legal
 - Apache-2.0 许可、NOTICE、第三方许可证文本（`LICENSES/`）、`docs/LEGAL.md` 法律风险自查

@@ -31,7 +31,7 @@ LOG=/tmp/zero-downtime.log
 
 probe() {
   wget -q -O /dev/null --timeout=3 "$BASE/actuator/health" || echo "FAIL health $(date +%H:%M:%S.%N)" >> "$LOG"
-  wget -q -O /dev/null --timeout=3 --header='X-API-Key: dev-mcp-key' "$BASE/mcp/info" || echo "FAIL mcp-info $(date +%H:%M:%S.%N)" >> "$LOG"
+  wget -q -O /dev/null --timeout=3 --header="X-API-Key: ${MCP_API_KEY:-dev-mcp-key}" "$BASE/mcp/info" || echo "FAIL mcp-info $(date +%H:%M:%S.%N)" >> "$LOG"
 }
 
 echo "== warmup =="

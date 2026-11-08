@@ -53,7 +53,7 @@ done
 
 echo "== applying manifests =="
 $KUBECTL apply -f "$HERE/00-namespace.yaml"
-$KUBECTL apply -f "$HERE/01-secrets.yaml"
+sh "$HERE/gen-secrets.sh"
 $KUBECTL apply -f "$HERE/02-postgres.yaml"
 $KUBECTL wait --for=condition=Available deployment/postgres -n tenancy-center --timeout=180s || true
 $KUBECTL apply -f "$HERE/03-tenant-service.yaml"
@@ -73,7 +73,7 @@ show_status
 
 echo
 echo "Access (inside this WSL distro):"
-echo "  gateway  : kubectl -n tenancy-center port-forward --address 0.0.0.0 svc/gateway 18080:8080"`
+echo "  gateway  : kubectl -n tenancy-center port-forward --address 0.0.0.0 svc/gateway 18080:8080"
 echo "  windows  : sh deploy/k8s/publish.sh start   # -> http://localhost:30080 / :30088"
 echo "  frontend : kubectl -n tenancy-center port-forward --address 0.0.0.0 svc/frontend 8088:80"
 echo "  or NodePorts: gateway 30080, frontend 30088 (WSL IP: $(hostname -I 2>/dev/null | awk '{print $1}'))"

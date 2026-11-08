@@ -85,6 +85,22 @@ sh /mnt/d/deepseekHarness/tenancy-center/deploy/k8s/zero-downtime-check.sh 90
 
 > `timeZone` 字段在最小化 k3s apiserver 上可能因缺 tzdata 报错，清单使用 UTC 时间表达。
 
+## 密钥生成（必须）
+
+`deploy.sh` 与 `prod/apply-prod.sh` 会自动调用 `gen-secrets.sh`：
+
+- Secret `tenancy-secrets` 不存在时，生成随机 JWT secret、内部令牌、PostgreSQL/mcp_db 密码与 MCP API Key；
+- Secret 已存在时**不覆盖**（避免破坏已初始化的 PostgreSQL 数据目录）；
+- `01-secrets.yaml` 只是 `CHANGE_ME_*` 模板，**不要直接 apply**（脚本不会应用它）。
+
+本地验证需要 MCP API Key：
+```sh
+set -a; . deploy/k8s/.generated-env; set +a
+pwsh scripts/verify.ps1 -BaseUrl http://localhost:30080 -McpApiKey "$MCP_API_KEY"
+```
+
+轮换：`kubectl -n tenancy-center delete secret tenancy-secrets` 后重跑 `gen-secrets.sh`，并同步修改 PostgreSQL 用户口令。
+
 ## 说明与限制
 
 - 面向**本地单节点验证**：单副本、local-path 存储、`IfNotPresent` + 本地导入镜像，无 HPA/PDB/NetworkPolicy。

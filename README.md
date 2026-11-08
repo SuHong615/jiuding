@@ -64,7 +64,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 
 ### Kubernetes（k3s，已验证）
 ```sh
-sh deploy/k8s/deploy.sh
+sh deploy/k8s/deploy.sh          # 首次部署自动生成随机 Secret（deploy/k8s/gen-secrets.sh）
 sh deploy/k8s/publish.sh start
 # 前端 http://localhost:30088 · 网关 http://localhost:30080
 sh deploy/k8s/prod/apply-prod.sh      # 生产 overlay：多副本/PDB/HPA/CronJob

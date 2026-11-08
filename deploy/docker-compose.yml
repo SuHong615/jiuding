@@ -13,9 +13,11 @@
 # limitations under the License.
 #
 # @author suhong
+# DEV ONLY defaults: every ${VAR:-...} fallback in this file is a demo value.
+# For shared/production use, set real values in deploy/.env or a secret manager;
+# see SECURITY.md and deploy/.env.example for random-generation commands.
 name: tenancy-center
 
-# 婢舵氨顫ら幋铚傝厬韫囧啩绔撮柨顕€鍎寸純灞傗偓鍌涚€杞扮瑐娑撳鏋冪紒鐔剁娑撹桨绮ㄦ惔鎾寸壌閻╊喖缍嶉敍?.閿涘绱?# 娴犮儰绌堕崥鍕箛閸斺€插▏閻劌鎮撴稉鈧禒?parent pom 娑?tenancy-common 濡€虫健閵?# 娴ｈ法鏁ら敍姝瀘cker compose --env-file .env up -d --build
 
 services:
   postgres:

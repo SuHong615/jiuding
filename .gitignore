@@ -31,6 +31,7 @@ logs/
 .env.*
 !.env.example
 deploy/.env
+deploy/k8s/.generated-env
 integration/.runtime/
 tests/.runtime/
 *.csv.tmp

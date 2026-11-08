@@ -90,6 +90,8 @@
 - [ ] 商标使用：产品名/风格名无暗示背书；已附非关联声明（九鼎/Jiuding、Codex-inspired）
 - [ ] 演示数据不含真实个人信息；默认账号/密钥仅本地
 - [ ] 无 `.env`、私钥、kubeconfig、真实令牌等敏感文件入库
+- [ ] `pwsh ./scripts/scan-secrets.ps1` 通过（工作区 + Git 历史；CI 已启用）
+- [ ] K8s 使用 `deploy/k8s/gen-secrets.sh` 生成随机 Secret，不直接 apply `01-secrets.yaml` 占位模板
 - [ ] 二进制/Docker 分发时随附许可证与源码获取方式（Temurin/H2/nginx/PostgreSQL/curl）
 - [ ] 商业发行前：律师复核、商标检索、FOSSA/ScanCode 扫描、DPIA、出口管制分类
 - [ ] 安全问题联系渠道（`SECURITY.md`）有效

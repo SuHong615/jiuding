@@ -40,8 +40,15 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "== DRY RUN: no cluster state will be changed =="
 fi
 
+echo "== secrets (random, generated once) =="
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "  (dry-run: skip gen-secrets.sh)"
+else
+  sh "$BASE/gen-secrets.sh"
+fi
+
 echo "== base manifests (with mcp_db init + MCP_DB_* env) =="
-for f in 00-namespace 01-secrets 02-postgres 03-tenant-service 04-approval-service \
+for f in 00-namespace 02-postgres 03-tenant-service 04-approval-service \
          05-agent-service 06-mcp-service 07-gateway 08-frontend; do
   $APPLY -f "$BASE/$f.yaml" >/dev/null
 done

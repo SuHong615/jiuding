@@ -83,6 +83,9 @@
 - [x] “Codex 风格”改为“Codex-inspired 视觉参考”，并加非关联声明；设计文档更名
 - [x] README 增加 Legal/Trademarks/Demo data 声明并链接本文档
 - [x] 仓库无 `.env`、私钥、kubeconfig 等敏感文件；`deploy/k8s/01-secrets.yaml` 标注 DEMO ONLY
+- [x] K8s 密钥改为 `gen-secrets.sh` 随机生成；`01-secrets.yaml` 仅保留 `CHANGE_ME_*` 模板
+- [x] `scripts/scan-secrets.ps1`（工作区 + Git 历史高置信度密钥扫描）已接入 CI；本地扫描 PASS
+- [x] 演示默认凭据清单与轮换步骤写入 `SECURITY.md`
 - [x] 前端 `package.json` 声明 `Apache-2.0`；Maven `pom` 版本/坐标统一
 - [x] 依赖扫描：npm 锁文件无 GPL/AGPL/SSPL；Java 依赖均为 Apache-2.0/BSD/MIT/MPL/EPL 类
 

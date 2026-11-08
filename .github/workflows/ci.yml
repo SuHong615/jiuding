@@ -57,3 +57,14 @@ jobs:
             fi
           done < <(git ls-files '*.java' '*.ts' '*.tsx' '*.css' '*.sql' '*.sh' '*.ps1' '*.yml' '*.yaml' | grep -v '^\\.github/')
           exit $missing
+
+  secret-scan:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan tracked files and history
+        shell: pwsh
+        run: ./scripts/scan-secrets.ps1
