@@ -48,7 +48,7 @@ public final class TenantCommands {
     }
 
     @Command(name = "tenant", mixinStandardHelpOptions = true,
-            description = "租户管理：查询 / 创建 / 提交 / 停用 / 启用 / 终止 / 删除 / 导入组织 / 导入账号",
+            description = "租户管理：查询 / 创建 / 提交 / 停用 / 启用 / 终止 / 删除 / 导入组织 / 导入账号 / 配额用量",
             subcommands = {
                     TenantCommands.ListCommand.class,
                     TenantCommands.GetCommand.class,
@@ -58,6 +58,7 @@ public final class TenantCommands {
                     TenantCommands.ActivateCommand.class,
                     TenantCommands.TerminateCommand.class,
                     TenantCommands.DeleteCommand.class,
+                    TenantCommands.QuotaCommand.class,
                     TenantCommands.ImportOrgsCommand.class,
                     TenantCommands.ImportAccountsCommand.class
             })
@@ -432,6 +433,75 @@ public final class TenantCommands {
             JsonNode data = apiForTenant(tenantId).postMultipart(
                     "/api/tenants/" + encPath(tenantId) + "/accounts/import", csv, "file", Map.of());
             return renderImport(data, true);
+        }
+    }
+
+    // ---------------------------------------------------------------- quota / usage (docs/17 §3)
+
+    @Command(name = "quota", aliases = {"usage"}, mixinStandardHelpOptions = true,
+            description = "租户配额与用量（席位/组织/存储/API RPM；用法同 tenant usage）")
+    public static class QuotaCommand extends BaseCommand {
+
+        @Parameters(index = "0", paramLabel = "<tenantId>", description = "租户 ID")
+        String tenantId;
+
+        @Override
+        public Integer call() {
+            String tid = tenantId == null ? "" : tenantId.trim();
+            JsonNode data = apiForTenant(tid).get("/api/tenants/" + encPath(tid) + "/quota", null);
+            if (jsonOutput()) {
+                out().println(Json.pretty(data));
+                return ExitCodes.OK;
+            }
+            String overallStatus = text(data, "status", "-");
+            List<List<String>> rows = new ArrayList<>();
+            rows.add(quotaRow("席位", Json.field(data, "seats"), overallStatus));
+            rows.add(quotaRow("组织单元", Json.field(data, "orgUnits"), overallStatus));
+            rows.add(quotaRow("存储(GB)", Json.field(data, "storageGb"), overallStatus));
+            rows.add(quotaRow("API RPM", Json.field(data, "apiRpm"), overallStatus));
+            out().println(TableRenderer.render(
+                    headers("资源", "已用", "上限", "剩余", "百分比", "状态"), rows));
+            out().println("租户: " + tid + " 计划: " + text(data, "plan", "-") + " 状态: " + overallStatus);
+            return ExitCodes.OK;
+        }
+
+        private static List<String> quotaRow(String label, JsonNode metric, String overallStatus) {
+            if (metric == null || metric.isNull() || !metric.isObject()) {
+                return row(label, "-", "-", "-", "-", overallStatus);
+            }
+            return row(label,
+                    num(metric, "used"),
+                    limitText(metric),
+                    num(metric, "remaining"),
+                    percentText(metric),
+                    text(metric, "status", overallStatus));
+        }
+
+        /** {@code null} / missing / non-numeric limit means "unlimited" (docs/17 §2). */
+        private static String limitText(JsonNode metric) {
+            JsonNode limit = metric.get("limit");
+            return limit == null || limit.isNull() || !limit.isNumber() ? "不限" : limit.asText();
+        }
+
+        private static String percentText(JsonNode metric) {
+            JsonNode percent = metric.get("percent");
+            if (percent != null && percent.isNumber()) {
+                return formatPercent(percent.asDouble());
+            }
+            JsonNode used = metric.get("used");
+            JsonNode limit = metric.get("limit");
+            if (used != null && used.isNumber() && limit != null && limit.isNumber()
+                    && limit.asDouble() > 0) {
+                return formatPercent(used.asDouble() * 100.0 / limit.asDouble());
+            }
+            return "-";
+        }
+
+        private static String formatPercent(double value) {
+            if (value == Math.rint(value)) {
+                return String.format(java.util.Locale.ROOT, "%.0f%%", value);
+            }
+            return String.format(java.util.Locale.ROOT, "%.1f%%", value);
         }
     }
 

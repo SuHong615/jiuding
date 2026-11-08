@@ -109,6 +109,13 @@ tenancy:
     mcp-timeout-ms: ${TENANCY_GATEWAY_MCP_TIMEOUT_MS:30000}
     health-timeout-ms: ${TENANCY_GATEWAY_HEALTH_TIMEOUT_MS:2000}
     connect-timeout-ms: ${TENANCY_GATEWAY_CONNECT_TIMEOUT_MS:5000}
+    # v7 tenant API RPM quota (docs/17 §5): limit fetched from
+    # GET /internal/tenants/{id}/quota (apiRpm.limit), cached, sliding 60s window.
+    tenant-quota:
+      enabled: ${TENANCY_TENANT_QUOTA_ENABLED:true}
+      cache-seconds: ${TENANCY_TENANT_QUOTA_CACHE_SECONDS:60}
+      window-seconds: ${TENANCY_TENANT_QUOTA_WINDOW_SECONDS:60}
+      request-timeout-ms: ${TENANCY_TENANT_QUOTA_TIMEOUT_MS:2000}
 
 logging:
   level:

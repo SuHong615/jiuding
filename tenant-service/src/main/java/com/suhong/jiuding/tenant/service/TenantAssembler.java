@@ -89,6 +89,7 @@ public class TenantAssembler {
                 request.quotaSeats(),
                 request.quotaStorageGb(),
                 request.quotaApiRpm(),
+                request.quotaOrgUnits(),
                 source.name(),
                 attributesJson(request.attributes()),
                 null,
@@ -121,6 +122,7 @@ public class TenantAssembler {
         fields.put("quota_seats", request.quotaSeats());
         fields.put("quota_storage_gb", request.quotaStorageGb());
         fields.put("quota_api_rpm", request.quotaApiRpm());
+        fields.put("quota_org_units", request.quotaOrgUnits());
         fields.put("attributes_json", attributesJson(request.attributes()));
         return fields;
     }
@@ -140,6 +142,7 @@ public class TenantAssembler {
                 intOrNull(values.get("quotaseats"), "quotaSeats"),
                 intOrNull(values.get("quotastoragegb"), "quotaStorageGb"),
                 intOrNull(values.get("quotapirm"), "quotaApiRpm"),
+                intOrNull(values.get("quotaorgunits"), "quotaOrgUnits"),
                 Texts.blankToNull(values.get("source")),
                 null,
                 null);

@@ -467,3 +467,53 @@ Select-String -Path D:\deepseekHarness\tenancy-center\deploy\**\Dockerfile -Patt
 
 其余 4 个后端 Dockerfile 与 tenant-service 同构（仅模块名/端口不同），在 compose 构建中途因内存预算中止；k8s 运行时验证使用同源 jar 的 `deploy/k8s/runtime.Dockerfile` 镜像，构建与运行均已证实。
 
+
+---
+
+## 10. PostgreSQL 备份与恢复（k8s，v7）
+
+数据集中在 `deploy/k8s/02-postgres.yaml` 的单个 postgres Deployment + PVC，含四个库：`tenant_db`、`approval_db`、`agent_db`、`mcp_db`。备份/恢复脚本通过 `kubectl exec` 在 pod 内执行 `pg_dump/pg_restore`，Windows/WSL 侧无需安装 psql 客户端。
+
+### 10.1 备份
+
+```sh
+# WSL 内执行；默认输出 deploy/k8s/backup/YYYYmmdd-HHMMSS（保留最近 7 份）
+sh /mnt/d/deepseekHarness/tenancy-center/deploy/k8s/backup.sh
+
+# 指定输出目录与保留份数
+sh deploy/k8s/backup.sh --out /data/jiuding-backups --keep 14
+```
+
+产物：
+
+```
+<out>/YYYYmmdd-HHMMSS/
+├── tenant_db.dump  approval_db.dump  agent_db.dump  mcp_db.dump   # pg_dump -Fc
+└── manifest.txt    # time/namespace/image/version + 每库 file/size/sha256
+```
+
+可用 `sha256sum *.dump` 与 manifest 对照校验完整性；任一库 pg_dump 失败脚本以非 0 退出并保留部分产物便于排查。
+
+### 10.2 恢复（危险操作）
+
+```sh
+# 必须先 --yes，否则脚本直接拒绝（exit 2）
+sh deploy/k8s/restore.sh --from deploy/k8s/backup/20261108-190945 --yes
+sh deploy/k8s/restore.sh --from <dir> --db tenant_db,mcp_db --yes
+```
+
+`restore.sh` 会按 manifest 校验 sha256，再对每个库执行 `pg_restore --clean --if-exists --no-owner`。恢复会**删除并重建**目标库对象，务必确认目标集群与备份目录；建议在独立 namespace 或临时集群先演练。
+
+### 10.3 运维建议
+
+- 频率：每日 02:00 全量（`--keep 7`）；发布/迁移前手工备份一次；
+- 异地：备份目录定期同步到 S3/MinIO（`mc cp --recursive` / `rclone sync`），保留策略按合规要求；
+- 演练：每月在独立 namespace/临时 k3s 上执行一次 restore，用 `psql -c 'select count(*) from tenants'` 抽样校验；
+- 告警：cron 包装 backup.sh + 日志采集，失败（非 0）触发告警。
+
+### 10.4 本机实测（2026-11-08）
+
+`sh deploy/k8s/backup.sh --out /tmp/jiuding-backup --keep 3` 在 k3s 实际执行成功：
+
+- 四库 dump 均生成：tenant_db 144,231 B、approval_db 369,932 B、agent_db 104,978 B、mcp_db 12,164 B；manifest.txt 含每库 sha256；
+- `sha256sum` 抽查与 manifest 一致；`restore.sh` 未带 `--yes` 时按预期拒绝（exit 2），未执行真实恢复（避免覆盖集群数据）。

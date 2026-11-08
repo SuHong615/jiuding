@@ -79,6 +79,13 @@ Node 版本：>= 18（本机验证 Node 25 / npm 11）。开发环境依赖网�
 - 顶栏「两步验证」入口 → `/security/mfa`：查询状态、绑定（secret/otpauth URL、一次性 8 个恢复码）、验证启用、停用。
 - 平台管理员 `/scim`：SCIM Token 列表/生成（一次性明文）/撤销、端点 URL 复制、User/Group 字段映射说明；导航按权限收敛。
 
+## v7 配额与用量
+
+- 租户详情「概览」新增「配额与用量」卡片：`GET /api/tenants/{id}/quota`，展示席位/组织部门/存储/API RPM 的
+  used/limit/remaining/percent、进度条与 OK / WARNING(≥80%) / EXCEEDED 状态色，含错误/空态兜底。
+- 新建/编辑租户表单新增 `quotaOrgUnits`（默认 50），并支持修改 seats/orgUnits/storageGb/apiRpm。
+- 账号创建、组织创建与 CSV 导入失败时识别后端 `QUOTA_EXCEEDED`，展示友好配额提示（导入错误行同步转换）。
+
 ## 工程约定
 
 - `src/api/client.ts`：统一 fetch 封装，解析 `{code,message,data}`，`code !== 0` 抛 `ApiError`；

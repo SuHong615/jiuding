@@ -39,6 +39,10 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 | `TENANCY_GATEWAY_REQUEST_TIMEOUT_MS` | `10000` | 普通代理超时 |
 | `TENANCY_GATEWAY_MCP_TIMEOUT_MS` | `30000` | `/mcp/**` 代理超时 |
 | `TENANCY_GATEWAY_HEALTH_TIMEOUT_MS` | `2000` | 健康/聚合探测超时 |
+| `TENANCY_TENANT_QUOTA_ENABLED` | `true` | v7 租户 API RPM 配额开关（仅 `/api/**` 代理请求、仅带 `tid` 的 JWT） |
+| `TENANCY_TENANT_QUOTA_CACHE_SECONDS` | `60` | `GET /internal/tenants/{id}/quota` 结果缓存秒数 |
+| `TENANCY_TENANT_QUOTA_WINDOW_SECONDS` | `60` | 租户 RPM 滑动窗口秒数 |
+| `TENANCY_TENANT_QUOTA_TIMEOUT_MS` | `2000` | 配额查询超时（失败降级为不限） |
 
 ## 接口
 
@@ -99,3 +103,6 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
   `ConcurrentHashMap` + 每窗口时间窗清理（每 1024 次调用清理过期 key），线程安全。
 - 客户端 IP：优先 `X-Forwarded-For` 首段，否则 `remoteAddr`；`User-Agent` 截断 256。
   调 tenant-service `/internal/auth/authenticate` 时携带 `X-Forwarded-For` 与 `User-Agent`（供 `account_login_events` 审计）；平台登录不调用下游。
+- 租户 API RPM 配额（docs/17 §5）：仅统计携带 `tid` 的 JWT 的 `/api/**` 代理请求（平台管理员/无 tid 不计数，`/api/auth/**` 与本地
+  `/api/platform/overview|health` 排除）；limit 来自 `GET /internal/tenants/{id}/quota` 的 `apiRpm.limit`（`X-Internal-Token`，缓存 60s，
+  查询失败/401 降级为不限并 WARN）；`key=tenantId` 60s 滑动窗口，超限 `429 {code:42901,message:"tenant api quota exceeded"}`。

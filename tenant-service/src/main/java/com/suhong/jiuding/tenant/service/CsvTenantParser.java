@@ -45,7 +45,7 @@ public class CsvTenantParser {
     private static final Set<String> KNOWN_HEADERS = Set.of(
             "tenantcode", "name", "contactname", "contactemail", "contactphone",
             "plan", "region", "isolationmode", "quotaseats", "quotastoragegb",
-            "quotapirm", "source");
+            "quotapirm", "quotaorgunits", "source");
 
     public CsvDocument parse(byte[] content, long maxBytes) {
         if (content == null || content.length == 0) {

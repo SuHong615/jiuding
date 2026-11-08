@@ -25,6 +25,7 @@ import com.suhong.jiuding.tenant.api.OrgUnitUpdateRequest;
 import com.suhong.jiuding.tenant.api.OrgUnitView;
 import com.suhong.jiuding.tenant.domain.OrgUnitStatus;
 import com.suhong.jiuding.tenant.domain.OrgUnitType;
+import com.suhong.jiuding.tenant.quota.QuotaGuard;
 import com.suhong.jiuding.tenant.repository.AccountRepository;
 import com.suhong.jiuding.tenant.repository.OrgUnitRepository;
 import com.suhong.jiuding.tenant.repository.OrgUnitRow;
@@ -61,15 +62,18 @@ public class OrgUnitService {
     private final AccountRepository accounts;
     private final TenantAccess access;
     private final AuditService auditService;
+    private final QuotaGuard quotaGuard;
 
     public OrgUnitService(OrgUnitRepository orgUnits,
                           AccountRepository accounts,
                           TenantAccess access,
-                          AuditService auditService) {
+                          AuditService auditService,
+                          QuotaGuard quotaGuard) {
         this.orgUnits = orgUnits;
         this.accounts = accounts;
         this.access = access;
         this.auditService = auditService;
+        this.quotaGuard = quotaGuard;
     }
 
     // ------------------------------------------------------------------ queries
@@ -113,6 +117,8 @@ public class OrgUnitService {
         if (request == null) {
             throw BizException.invalid("request body is required");
         }
+        // docs/17 section 4: organization unit quota is enforced over non deleted units.
+        quotaGuard.assertOrgUnitsAvailable(tenant, orgUnits.countByTenant(tenant.id()));
         OrgUnitType type = OrgUnitType.parse(request.type());
         String code = request.code() == null ? null : request.code().trim();
         if (code == null || code.isBlank()) {

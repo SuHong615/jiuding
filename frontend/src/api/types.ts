@@ -167,6 +167,7 @@ export interface TenantView {
   riskLevel?: string | null
   riskScore?: number | null
   quotaSeats?: number | null
+  quotaOrgUnits?: number | null
   quotaStorageGb?: number | null
   quotaApiRpm?: number | null
   source?: string
@@ -212,6 +213,7 @@ export interface TenantCreatePayload {
   region?: string
   isolationMode?: string
   quotaSeats?: number | null
+  quotaOrgUnits?: number | null
   quotaStorageGb?: number | null
   quotaApiRpm?: number | null
   source?: string
@@ -231,6 +233,27 @@ export interface CollectJobView {
   errors?: string[] | null
   createdAt?: string | null
   finishedAt?: string | null
+}
+
+/* ------------------------------ 配额与用量（docs/17 §3） ------------------------------ */
+
+export interface QuotaDimension {
+  limit?: number | null
+  used?: number | null
+  remaining?: number | null
+  percent?: number | null
+}
+
+export type QuotaStatus = 'OK' | 'WARNING' | 'EXCEEDED'
+
+export interface QuotaView {
+  tenantId?: string
+  plan?: string | null
+  seats?: QuotaDimension
+  orgUnits?: QuotaDimension
+  storageGb?: QuotaDimension
+  apiRpm?: QuotaDimension
+  status?: QuotaStatus | string
 }
 
 /* ------------------------------ 审批 ------------------------------ */

@@ -35,6 +35,7 @@ interface TenantFormState {
   region: string
   isolationMode: string
   quotaSeats: string
+  quotaOrgUnits: string
   quotaStorageGb: string
   quotaApiRpm: string
   source: string
@@ -51,6 +52,7 @@ const EMPTY_FORM: TenantFormState = {
   region: 'cn-shanghai',
   isolationMode: 'SHARED_SCHEMA',
   quotaSeats: '50',
+  quotaOrgUnits: '50',
   quotaStorageGb: '100',
   quotaApiRpm: '600',
   source: 'MANUAL',
@@ -69,6 +71,7 @@ function formFromTenant(tenant?: TenantView | null): TenantFormState {
     region: tenant.region || 'cn-shanghai',
     isolationMode: tenant.isolationMode || 'SHARED_SCHEMA',
     quotaSeats: tenant.quotaSeats != null ? String(tenant.quotaSeats) : '',
+    quotaOrgUnits: tenant.quotaOrgUnits != null ? String(tenant.quotaOrgUnits) : '50',
     quotaStorageGb: tenant.quotaStorageGb != null ? String(tenant.quotaStorageGb) : '',
     quotaApiRpm: tenant.quotaApiRpm != null ? String(tenant.quotaApiRpm) : '',
     source: tenant.source || 'MANUAL',
@@ -135,6 +138,7 @@ export function TenantCreateDrawer({
       next.contactPhone = '联系电话格式不正确'
     for (const [key, label] of [
       ['quotaSeats', '席位配额'],
+      ['quotaOrgUnits', '组织配额'],
       ['quotaStorageGb', '存储配额'],
       ['quotaApiRpm', 'API 配额'],
     ] as const) {
@@ -165,6 +169,7 @@ export function TenantCreateDrawer({
       region: form.region.trim() || 'cn-shanghai',
       isolationMode: form.isolationMode,
       quotaSeats: toNumber(form.quotaSeats),
+      quotaOrgUnits: toNumber(form.quotaOrgUnits),
       quotaStorageGb: toNumber(form.quotaStorageGb),
       quotaApiRpm: toNumber(form.quotaApiRpm),
       source: form.source,
@@ -289,6 +294,14 @@ export function TenantCreateDrawer({
               value={form.quotaSeats}
               inputMode="numeric"
               onChange={setText('quotaSeats')}
+            />
+          </Field>
+          <Field label="组织配额" error={errors.quotaOrgUnits} hint="可创建的组织部门上限，默认 50">
+            <input
+              className={`input ${errors.quotaOrgUnits ? 'has-error' : ''}`}
+              value={form.quotaOrgUnits}
+              inputMode="numeric"
+              onChange={setText('quotaOrgUnits')}
             />
           </Field>
           <Field label="存储配额（GB）" error={errors.quotaStorageGb}>

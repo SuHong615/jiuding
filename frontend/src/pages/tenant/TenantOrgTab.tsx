@@ -27,6 +27,7 @@ import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Modal'
 import { useToast } from '../../components/Toast'
 import { formatDateTime } from '../../utils/format'
+import { friendlyErrorMessage, friendlyQuotaText } from '../../utils/errors'
 import { ORG_TYPE_OPTIONS, orgStatusLabel, orgStatusTone, orgTypeLabel } from '../../utils/labels'
 import {
   collectDescendantIds,
@@ -248,7 +249,7 @@ export function TenantOrgTab({
       toast.success(`导入完成：成功 ${result?.imported ?? 0} 条`)
       units.reload()
     } catch (err) {
-      setImportError(errorMessage(err))
+      setImportError(friendlyErrorMessage(err))
     } finally {
       setImporting(false)
     }
@@ -325,7 +326,7 @@ export function TenantOrgTab({
         setFormMode(null)
         units.reload()
       } catch (err) {
-        setFormError(errorMessage(err))
+        setFormError(friendlyErrorMessage(err))
       } finally {
         setSaving(false)
       }
@@ -388,7 +389,7 @@ export function TenantOrgTab({
         units.reload()
       }
     } catch (err) {
-      setFormError(errorMessage(err))
+      setFormError(friendlyErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -662,7 +663,7 @@ export function TenantOrgTab({
                       {importResult.errors.map((error, index) => (
                         <tr key={index}>
                           <td className="mono">{error.row ?? '—'}</td>
-                          <td className="muted">{error.message || '—'}</td>
+                          <td className="muted">{friendlyQuotaText(error.message)}</td>
                         </tr>
                       ))}
                     </tbody>

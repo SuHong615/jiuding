@@ -387,6 +387,42 @@ function Test-ScimAvailable {
     }
 }
 
+function Test-QuotaAvailable {
+    param([string]$Url, [string]$Token)
+    if ([string]::IsNullOrWhiteSpace($Token)) {
+        return [pscustomobject]@{ Available = $false; Detail = 'admin login failed; cannot probe quota API' }
+    }
+    $headers = @{ Authorization = ("Bearer {0}" -f $Token) }
+    $tenantId = ''
+    try {
+        $listResponse = Invoke-WebRequest -Uri "$Url/api/tenants?page=0&size=1" -Headers $headers -UseBasicParsing -TimeoutSec 10
+        $listPayload = $listResponse.Content | ConvertFrom-Json
+        $items = @($listPayload.data.items)
+        if ($items.Count -gt 0) { $tenantId = [string]$items[0].id }
+    }
+    catch {
+        return [pscustomobject]@{ Available = $false; Detail = ('GET /api/tenants failed: ' + $_.Exception.Message) }
+    }
+    if ([string]::IsNullOrWhiteSpace($tenantId)) {
+        return [pscustomobject]@{ Available = $false; Detail = 'no tenant available to probe GET /api/tenants/{id}/quota' }
+    }
+    try {
+        $quotaResponse = Invoke-WebRequest -Uri ("$Url/api/tenants/" + [uri]::EscapeDataString($tenantId) + "/quota") -Headers $headers -UseBasicParsing -TimeoutSec 10
+        $quotaPayload = $quotaResponse.Content | ConvertFrom-Json
+        $ok = ($null -ne $quotaPayload) -and -not (($quotaPayload.PSObject.Properties.Name -contains 'code') -and [int]$quotaPayload.code -ne 0)
+        if ($ok) {
+            return [pscustomobject]@{ Available = $true; Detail = ('GET /api/tenants/{id}/quota -> 200 (tenant ' + $tenantId + ')') }
+        }
+        return [pscustomobject]@{ Available = $false; Detail = 'quota API returned a non-zero envelope' }
+    }
+    catch {
+        $status = 0
+        $response = $_.Exception.Response
+        if ($response) { $status = [int]$response.StatusCode }
+        return [pscustomobject]@{ Available = $false; Detail = ('GET /api/tenants/{id}/quota -> HTTP ' + $status) }
+    }
+}
+
 # ---------------------------------------------------------------- static checks
 Write-Host '==> static checks' -ForegroundColor Cyan
 $composeFile = Join-Path $root 'deploy\docker-compose.yml'
@@ -426,7 +462,7 @@ if ($missingScripts.Count -eq 0) { Add-Result 'scripts' 'PASS' "$($requiredScrip
 else { Add-Result 'scripts' 'FAIL' ("missing: " + ($missingScripts -join ', ')) }
 
 $testsDir = Join-Path $root 'tests'
-$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
+$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-v7.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
 $missingTests = @()
 foreach ($test in $requiredTests) {
     if (-not (Test-Path (Join-Path $testsDir $test))) { $missingTests += $test }
@@ -467,6 +503,7 @@ else {
         Add-Result 'E2E skill versions' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v6 chain' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v6b SCIM' 'SKIP' 'gateway not ready'
+        Add-Result 'E2E v7 quota' 'SKIP' 'gateway not ready'
     }
     else {
         Add-Result 'gateway health' 'PASS' $BaseUrl
@@ -634,6 +671,25 @@ else {
         }
         else {
             Add-Result 'E2E v6b SCIM' 'SKIP' '-SkipE2E'
+        }
+
+        # ------------------------------------------------ v7 quota / usage checks
+        if (-not $SkipE2E) {
+            $quotaApi = Test-QuotaAvailable -Url $BaseUrl -Token $adminProbeToken
+            $e2eV7Script = Join-Path $testsDir 'e2e-v7.ps1'
+            if ($quotaApi.Available -and (Test-Path $e2eV7Script)) {
+                Write-Host ''
+                Write-Host '==> tests/e2e-v7.ps1' -ForegroundColor Cyan
+                & $e2eV7Script -BaseUrl $BaseUrl -TimeoutSeconds $TimeoutSeconds
+                if ($LASTEXITCODE -eq 0) { Add-Result 'E2E v7 quota' 'PASS' 'quota API/enforce org+seat/import update/RPM/unlimited' }
+                else { Add-Result 'E2E v7 quota' 'FAIL' "exit $LASTEXITCODE" }
+            }
+            else {
+                Add-Result 'E2E v7 quota' 'SKIP' $quotaApi.Detail
+            }
+        }
+        else {
+            Add-Result 'E2E v7 quota' 'SKIP' '-SkipE2E'
         }
     }
 }

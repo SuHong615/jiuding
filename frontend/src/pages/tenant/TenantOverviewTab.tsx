@@ -22,6 +22,7 @@ import { SectionCard } from '../../components/Forms'
 import { Icon } from '../../components/Icon'
 import { RatingBadge } from '../../components/RatingBadge'
 import { Badge } from '../../components/Badge'
+import { TenantQuotaCard } from '../../components/TenantQuotaCard'
 import { formatDateTime, formatNumber } from '../../utils/format'
 import {
   isolationLabel,
@@ -67,6 +68,8 @@ export function TenantOverviewTab({
             <InfoRow label="更新时间" value={formatDateTime(tenant.updatedAt)} />
           </div>
         </SectionCard>
+
+        <TenantQuotaCard tenantId={tenant.id} />
 
         {showRating ? (
           <SectionCard title="评级与身份域" description="评级、组织与账号规模">
@@ -140,27 +143,6 @@ export function TenantOverviewTab({
             打开审批中心
             <Icon name="arrowRight" size={14} />
           </Link>
-        </SectionCard>
-
-        <SectionCard title="配额">
-          <div className="stat-grid">
-            <div className="stat">
-              <span>席位配额</span>
-              <strong>{formatNumber(tenant.quotaSeats)}</strong>
-            </div>
-            <div className="stat">
-              <span>存储配额</span>
-              <strong>{formatNumber(tenant.quotaStorageGb)} GB</strong>
-            </div>
-            <div className="stat">
-              <span>API 配额</span>
-              <strong>{formatNumber(tenant.quotaApiRpm)} RPM</strong>
-            </div>
-            <div className="stat">
-              <span>风险评分</span>
-              <strong>{tenant.riskScore ?? '—'}</strong>
-            </div>
-          </div>
         </SectionCard>
       </div>
     </div>

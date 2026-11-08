@@ -101,6 +101,33 @@ pwsh scripts/verify.ps1 -BaseUrl http://localhost:30080 -McpApiKey "$MCP_API_KEY
 
 轮换：`kubectl -n tenancy-center delete secret tenancy-secrets` 后重跑 `gen-secrets.sh`，并同步修改 PostgreSQL 用户口令。
 
+## 备份与恢复（PostgreSQL，四库）
+
+数据位于 `postgres` Deployment 的 PVC，包含 `tenant_db` / `approval_db` / `agent_db` / `mcp_db`。
+`backup.sh` / `restore.sh` 通过 `kubectl exec` 在 pod 内执行 `pg_dump -Fc` / `pg_restore`，无需本地 psql 客户端。
+
+```sh
+# 备份（WSL 内执行）；默认 deploy/k8s/backup/YYYYmmdd-HHMMSS，保留最近 7 份
+sh deploy/k8s/backup.sh
+sh deploy/k8s/backup.sh --out /data/jiuding-backups --keep 14
+
+# 恢复：必须显式 --yes，否则脚本拒绝执行（exit 2）
+sh deploy/k8s/restore.sh --from deploy/k8s/backup/20261108-190945 --yes
+sh deploy/k8s/restore.sh --from <dir> --db tenant_db,mcp_db --yes
+```
+
+产物结构：
+
+```
+<out>/YYYYmmdd-HHMMSS/
+├── tenant_db.dump  approval_db.dump  agent_db.dump  mcp_db.dump
+└── manifest.txt    # time/namespace/image/version + 每库 file/size/sha256
+```
+
+- `restore.sh` 会先按 manifest 校验 sha256，再执行 `pg_restore --clean --if-exists --no-owner`；恢复会**删除并重建**目标库对象。
+- 建议：每日 02:00 全量 + `--keep 7`；发布/迁移前手工备份；备份目录定期同步到 S3/MinIO；每月做一次恢复演练（独立 namespace）。
+- 实测（2026-11-08 k3s）：`backup.sh --out /tmp/jiuding-backup --keep 3` 四库 dump + manifest 成功，sha256 与 manifest 一致；仅验证备份，未执行恢复。
+
 ## 说明与限制
 
 - 面向**本地单节点验证**：单副本、local-path 存储、`IfNotPresent` + 本地导入镜像，无 HPA/PDB/NetworkPolicy。

@@ -22,6 +22,8 @@
 - **MCP 生态**：22 工具、SSE、按人 API Key、调用审计、外部 MCP 服务器配置
 - **企业身份**：平台/租户双通道登录、OIDC/SSO、MFA（TOTP+恢复码）、SCIM 2.0
 - **治理与合规**：五档 RBAC + 权限矩阵、审计导出、PII 掩码、登录限流、数据生命周期
+- **配额与用量**：席位/组织配额强制（409）、用量 API、网关按租户 API RPM 限流（429）、控制台进度卡
+- **运维**：k3s 随机 Secret 生成、PostgreSQL 四库备份/恢复、零中断滚动检查
 - **双环境交付**：Docker Compose 全栈 + k3s 生产 overlay（2 副本/PDB/HPA/CronJob/零中断）
 - **可验证**：473 自动化测试 + 6 套 E2E + 17 项统一验证脚本
 
@@ -111,7 +113,7 @@ jiuding/
 | [Skill 规范](docs/04-skill-spec.md) / [MCP 规范](docs/05-mcp-spec.md) | 规则 DSL 与 MCP 工具 |
 | [运维部署](docs/06-devops.md) | Docker/k3s/生产化 |
 | [验收报告](docs/10-acceptance-report.md) | 473 测试 / E2E / 实测数据 |
-| [v3 RBAC](docs/13-v3-account-login-rbac.md) · [v4 安全合规](docs/14-v4-security-compliance-production.md) · [v5 技能/MCP/RBAC](docs/15-v5-skill-mcp-onboarding-rbac.md) · [v6 SSO/MFA/SCIM](docs/16-v6-sso-mfa-scim.md) | 版本演进 |
+| [v3 RBAC](docs/13-v3-account-login-rbac.md) · [v4 安全合规](docs/14-v4-security-compliance-production.md) · [v5 技能/MCP/RBAC](docs/15-v5-skill-mcp-onboarding-rbac.md) · [v6 SSO/MFA/SCIM](docs/16-v6-sso-mfa-scim.md) · [v7 配额/备份](docs/17-v7-quota-usage-backup.md) | 版本演进 |
 
 ## 验证
 

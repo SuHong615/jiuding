@@ -39,10 +39,10 @@ public class TenantRepository {
     private static final List<String> COLUMN_NAMES = List.of(
             "id", "tenant_code", "name", "contact_name", "contact_email", "contact_phone",
             "plan", "region", "isolation_mode", "status", "risk_level", "risk_score",
-            "quota_seats", "quota_storage_gb", "quota_api_rpm", "source", "attributes_json",
-            "reject_reason", "created_at", "updated_at", "submitted_at", "decided_at",
-            "activated_at", "rating_grade", "rating_score", "rating_assessed_at", "deleted_at",
-            "version");
+            "quota_seats", "quota_storage_gb", "quota_api_rpm", "quota_org_units", "source",
+            "attributes_json", "reject_reason", "created_at", "updated_at", "submitted_at",
+            "decided_at", "activated_at", "rating_grade", "rating_score", "rating_assessed_at",
+            "deleted_at", "version");
 
     private static final String COLUMNS = String.join(", ", COLUMN_NAMES);
     private static final String INSERT_SQL = "INSERT INTO tenants (" + COLUMNS + ") VALUES ("
@@ -64,6 +64,7 @@ public class TenantRepository {
             (Integer) rs.getObject("quota_seats"),
             (Integer) rs.getObject("quota_storage_gb"),
             (Integer) rs.getObject("quota_api_rpm"),
+            (Integer) rs.getObject("quota_org_units"),
             rs.getString("source"),
             rs.getString("attributes_json"),
             rs.getString("reject_reason"),
@@ -117,10 +118,10 @@ public class TenantRepository {
                 row.id(), row.tenantCode(), row.name(), row.contactName(), row.contactEmail(),
                 row.contactPhone(), row.plan(), row.region(), row.isolationMode(), row.status(),
                 row.riskLevel(), row.riskScore(), row.quotaSeats(), row.quotaStorageGb(),
-                row.quotaApiRpm(), row.source(), row.attributesJson(), row.rejectReason(),
-                row.createdAt(), row.updatedAt(), row.submittedAt(), row.decidedAt(),
-                row.activatedAt(), row.ratingGrade(), row.ratingScore(), row.ratingAssessedAt(),
-                row.deletedAt(), row.version());
+                row.quotaApiRpm(), row.quotaOrgUnits(), row.source(), row.attributesJson(),
+                row.rejectReason(), row.createdAt(), row.updatedAt(), row.submittedAt(),
+                row.decidedAt(), row.activatedAt(), row.ratingGrade(), row.ratingScore(),
+                row.ratingAssessedAt(), row.deletedAt(), row.version());
     }
 
     /**

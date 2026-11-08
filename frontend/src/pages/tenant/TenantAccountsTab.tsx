@@ -43,6 +43,7 @@ import { Modal } from '../../components/Modal'
 import { Pager } from '../../components/Pager'
 import { useToast } from '../../components/Toast'
 import { formatDateTime, truncate } from '../../utils/format'
+import { friendlyErrorMessage, friendlyQuotaText } from '../../utils/errors'
 import {
   ACCOUNT_ROLE_OPTIONS,
   ACCOUNT_STATUS_OPTIONS,
@@ -196,7 +197,7 @@ export function TenantAccountsTab({
       toast.success(`导入完成：成功 ${result?.imported ?? 0} 条`)
       accounts.reload()
     } catch (err) {
-      setImportError(errorMessage(err))
+      setImportError(friendlyErrorMessage(err))
     } finally {
       setImporting(false)
     }
@@ -417,7 +418,7 @@ export function TenantAccountsTab({
         accounts.reload()
       }
     } catch (err) {
-      setFormError(errorMessage(err))
+      setFormError(friendlyErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -1118,7 +1119,7 @@ export function TenantAccountsTab({
                       {importResult.errors.map((error, index) => (
                         <tr key={index}>
                           <td className="mono">{error.row ?? '—'}</td>
-                          <td className="muted">{error.message || '—'}</td>
+                          <td className="muted">{friendlyQuotaText(error.message)}</td>
                         </tr>
                       ))}
                     </tbody>

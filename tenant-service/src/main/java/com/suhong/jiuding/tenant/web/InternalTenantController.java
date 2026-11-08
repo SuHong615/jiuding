@@ -23,6 +23,8 @@ import com.suhong.jiuding.tenant.api.RatingView;
 import com.suhong.jiuding.tenant.api.RiskUpdateRequest;
 import com.suhong.jiuding.tenant.api.StatusUpdateRequest;
 import com.suhong.jiuding.tenant.api.TenantView;
+import com.suhong.jiuding.tenant.quota.QuotaService;
+import com.suhong.jiuding.tenant.quota.QuotaView;
 import com.suhong.jiuding.tenant.service.AccountService;
 import com.suhong.jiuding.tenant.service.RatingService;
 import com.suhong.jiuding.tenant.service.TenantService;
@@ -47,13 +49,16 @@ public class InternalTenantController {
     private final TenantService tenantService;
     private final AccountService accountService;
     private final RatingService ratingService;
+    private final QuotaService quotaService;
 
     public InternalTenantController(TenantService tenantService,
                                     AccountService accountService,
-                                    RatingService ratingService) {
+                                    RatingService ratingService,
+                                    QuotaService quotaService) {
         this.tenantService = tenantService;
         this.accountService = accountService;
         this.ratingService = ratingService;
+        this.quotaService = quotaService;
     }
 
     @GetMapping("/{id}")
@@ -81,5 +86,11 @@ public class InternalTenantController {
     @GetMapping("/{id}/rating")
     public ApiResponse<RatingView> rating(@PathVariable String id) {
         return ApiResponses.ok(ratingService.currentInternal(id));
+    }
+
+    /** Quota snapshot for the gateway API-RPM limiter (docs/17 section 5). */
+    @GetMapping("/{id}/quota")
+    public ApiResponse<QuotaView> quota(@PathVariable String id) {
+        return ApiResponses.ok(quotaService.quotaInternal(id));
     }
 }

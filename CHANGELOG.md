@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+- v7 配额与用量：席位/组织配额强制（409 `QUOTA_EXCEEDED`）、`GET /api/tenants/{id}/quota` 用量 API、网关按租户 API RPM 限流（429/42901）、控制台配额卡片
+- v7 运维：`deploy/k8s/backup.sh` / `restore.sh`（四库 pg_dump/pg_restore + manifest sha256）、k3s 随机 Secret 生成、E2E v7
+
 ### Planned
 - 产品化加固：多租户数据面隔离（RLS / 独立 schema）、备份恢复、压测与容量模型
 - OIDC 多 IdP、refresh token、平台用户 MFA

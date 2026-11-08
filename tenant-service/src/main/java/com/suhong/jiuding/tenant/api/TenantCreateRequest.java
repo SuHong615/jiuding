@@ -58,8 +58,29 @@ public record TenantCreateRequest(
         @Min(1)
         @Max(10_000_000)
         Integer quotaApiRpm,
+        Integer quotaOrgUnits,
         @Size(max = 16)
         String source,
         Map<String, Object> attributes,
         Boolean autoSubmit) {
+
+    /** Backwards compatible constructor without {@code quotaOrgUnits} (v6 callers/tests). */
+    public TenantCreateRequest(String tenantCode,
+                               String name,
+                               String contactName,
+                               String contactEmail,
+                               String contactPhone,
+                               String plan,
+                               String region,
+                               String isolationMode,
+                               Integer quotaSeats,
+                               Integer quotaStorageGb,
+                               Integer quotaApiRpm,
+                               String source,
+                               Map<String, Object> attributes,
+                               Boolean autoSubmit) {
+        this(tenantCode, name, contactName, contactEmail, contactPhone, plan, region,
+                isolationMode, quotaSeats, quotaStorageGb, quotaApiRpm, null, source,
+                attributes, autoSubmit);
+    }
 }

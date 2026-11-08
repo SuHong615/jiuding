@@ -20,7 +20,8 @@ package com.suhong.jiuding.tenant.repository;
 import java.time.LocalDateTime;
 
 /**
- * Row projection of {@code tenants} (docs/03-data-model.md + docs/11 V2 columns).
+ * Row projection of {@code tenants} (docs/03-data-model.md + docs/11 V2 columns +
+ * docs/17 V8 {@code quota_org_units}).
  * Times are UTC wall-clock {@link LocalDateTime} values and are rendered as ISO
  * instants by the API layer.
  */
@@ -40,6 +41,7 @@ public record TenantRow(
         Integer quotaSeats,
         Integer quotaStorageGb,
         Integer quotaApiRpm,
+        Integer quotaOrgUnits,
         String source,
         String attributesJson,
         String rejectReason,
@@ -53,4 +55,40 @@ public record TenantRow(
         LocalDateTime ratingAssessedAt,
         LocalDateTime deletedAt,
         long version) {
+
+    /** Backwards compatible constructor (v6 row without {@code quota_org_units}). */
+    public TenantRow(String id,
+                     String tenantCode,
+                     String name,
+                     String contactName,
+                     String contactEmail,
+                     String contactPhone,
+                     String plan,
+                     String region,
+                     String isolationMode,
+                     String status,
+                     String riskLevel,
+                     Integer riskScore,
+                     Integer quotaSeats,
+                     Integer quotaStorageGb,
+                     Integer quotaApiRpm,
+                     String source,
+                     String attributesJson,
+                     String rejectReason,
+                     LocalDateTime createdAt,
+                     LocalDateTime updatedAt,
+                     LocalDateTime submittedAt,
+                     LocalDateTime decidedAt,
+                     LocalDateTime activatedAt,
+                     String ratingGrade,
+                     Integer ratingScore,
+                     LocalDateTime ratingAssessedAt,
+                     LocalDateTime deletedAt,
+                     long version) {
+        this(id, tenantCode, name, contactName, contactEmail, contactPhone, plan, region,
+                isolationMode, status, riskLevel, riskScore, quotaSeats, quotaStorageGb,
+                quotaApiRpm, null, source, attributesJson, rejectReason, createdAt, updatedAt,
+                submittedAt, decidedAt, activatedAt, ratingGrade, ratingScore, ratingAssessedAt,
+                deletedAt, version);
+    }
 }

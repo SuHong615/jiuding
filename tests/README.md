@@ -17,6 +17,7 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 | `e2e-skill.ps1` | **v5.1 技能版本/调试 E2E**（docs/15 §12）：上传 zip（1.0.0）→ 版本列表 → `PUT` 另存新版本（1.1.0）→ 多版本列表 → 旧版本详情内容正确 → debug 命中/未命中（decision/actions/matchedRules/durationMs）→ 不存在版本 404 → 清理 |
 | `e2e-v6.ps1` | **v6 阶段 A E2E**（docs/16 §2/§3）：OIDC `status`（未配置 enabled=false）/`authorize` 404/`callback` 400；MFA 租户账号 setup→verify（TOTP）→登录返回 `mfaRequired`→`/api/auth/login/mfa` 成功→错误码 401→恢复码一次性→禁用→审计（MFA_ENROLLED/VERIFIED/DISABLED） |
 | `e2e-v6b.ps1` | **v6 阶段 B SCIM E2E**（docs/16 §7.1）：SCIM token 创建（明文一次）/撤销、无 token 与坏 token 401、ServiceProviderConfig 200；Users POST/GET/filter/GET id/PATCH active=false/PUT displayName/分页/DELETE；Groups POST/GET/filter/PATCH 改名+成员/DELETE（204 或 409 均接受）；SCIM Error schema（401/404/409）；清理撤销 token + 软删租户 |
+| `e2e-v7.ps1` | **v7 配额/用量/RPM E2E**（docs/17）：建租户（quotaSeats=2/quotaOrgUnits=2/quotaApiRpm=3）→ `GET /api/tenants/{id}/quota` 字段/状态 → 组织与账号按上限创建、超限 409 → CSV 导入（重复行 skipped + 超限行 failed，不中断）→ PUT 提升配额并校验 → 租户 JWT 网关 RPM 第 4 次 429/42901（未实现 SKIP）→ 无配额租户不受限 → 软删租户 |
 | `mcp-smoke.ps1` | v1 MCP 协议冒烟：`initialize` / `notifications/initialized` / `ping` / `tools/list`（14 工具）/ `tools/call` / 未知方法 `-32601` / `GET /mcp/info` |
 | `mcp-smoke-v2.ps1` | **v2 MCP 冒烟**：`tools/list` 数量（14 基础工具 + 8 个 v2 工具 = 22）+ `org.tree` / `account.list` / `rating.list` 调用断言 |
 | `README.md` | 本文件 |
@@ -46,6 +47,9 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 11. `e2e-v6b.ps1` 依赖 `docs/16 §7.1` 的 SCIM 2.0 接口：管理 API（`/api/platform/scim-tokens`，平台管理员 JWT，
     token 明文仅一次）与 SCIM 端点（`/scim/v2/**`，`Authorization: Bearer scim_...`，白名单不经 JWT）。
     **后端未部署 SCIM 时整体 SKIP**；SCIM 响应是 RFC 7644 原生文档（非 `ApiResponse` 包），脚本按原生 JSON 断言。
+12. `e2e-v7.ps1` 依赖 `docs/17` 的配额/用量 API（`GET /api/tenants/{id}/quota`）与网关 RPM 限流：
+    建租户时传 `quotaOrgUnits`（迁移 V8 新字段）；**quota 路由缺失时整体 SKIP**；
+    网关 RPM 默认不启用，6 次租户 JWT 调用内没有 429 时该断言为 SKIP（不算失败）。
 
 ## 执行
 
@@ -75,6 +79,9 @@ pwsh ./tests/e2e-v6.ps1 -BaseUrl http://localhost:18080
 # v6B SCIM E2E（SCIM token/Users/Groups/过滤/分页/错误 schema/清理）
 pwsh ./tests/e2e-v6b.ps1 -BaseUrl http://localhost:18080
 
+# v7 配额/用量/RPM E2E（配额字段→组织/账号超限→导入超限→PUT 提升→RPM 429→无限额租户）
+pwsh ./tests/e2e-v7.ps1 -BaseUrl http://localhost:18080
+
 # 指定 k8s 端口
 powershell -File ./tests/e2e-v2.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v3.ps1 -BaseUrl http://localhost:30080
@@ -83,6 +90,7 @@ powershell -File ./tests/e2e-v5.ps1 -BaseUrl http://localhost:30080 -TenantServi
 powershell -File ./tests/e2e-skill.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v6.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v6b.ps1 -BaseUrl http://localhost:30080
+powershell -File ./tests/e2e-v7.ps1 -BaseUrl http://localhost:30080
 
 # MCP 协议冒烟
 pwsh ./tests/mcp-smoke.ps1 -BaseUrl http://localhost:18080 -ApiKey dev-mcp-key
@@ -94,8 +102,8 @@ pwsh ./scripts/verify.ps1
 pwsh ./scripts/verify.ps1 -TenantServiceUrl http://localhost:8081
 ```
 
-建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `scripts/verify.ps1`。
-`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
+建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `scripts/verify.ps1`。
+`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
 
 ## 版本能力门（v2 rollout 期间的关键行为）
 
@@ -180,6 +188,17 @@ OIDC 未部署 → `[SKIP] v6 api availability - v6 API not deployed; GET /api/a
 任一缺失 → `[SKIP] scim api availability - SCIM API not deployed; ...`，其余 30 条断言全部 `SKIP`，退出码 0。
 `scripts/verify.ps1` 复用同一探测，输出 `E2E v6b SCIM - SKIP <缺失标记>` 或
 `E2E v6b SCIM - PASS SCIM token + ServiceProviderConfig + Users/Groups CRUD/filter/pagination/error schema`。
+
+### v7 配额/用量能力门
+
+`e2e-v7.ps1` 建租户后立即调用 `GET /api/tenants/{id}/quota` 作为能力标记：
+
+- 200 且含 `seats/orgUnits/storageGb/apiRpm/status` → 继续全部配额断言；
+- 404/405/500/501 → `[SKIP] quota api availability - ... (v7 quota API not deployed)`，其余 20 条断言全部
+  `SKIP`，退出码 0（脚本会清理刚建的租户）。
+
+`scripts/verify.ps1` 的 `Test-QuotaAvailable` 复用同一探测：取列表里第一个租户调用 quota；没有租户时
+`SKIP 'no tenant available to probe...'`，不创建数据。网关 RPM 未启用时 `rpm 429` 断言为 SKIP。
 
 ## 断言与退出码
 
@@ -367,6 +386,25 @@ OIDC 未部署 → `[SKIP] v6 api availability - v6 API not deployed; GET /api/a
 | Token | scim token list / revoke / revoked 401 | token 列表含该 id；DELETE 撤销；撤销后 SCIM 调用 → 401 |
 | 清理 | scim tenant cleanup | 终止 + 软删测试租户（含尽力清理 group/member user） |
 
+### e2e-v7.ps1 断言清单（23 条，docs/17）
+
+| 分组 | 断言 | 说明 |
+|---|---|---|
+| 前置 | preflight gateway / login admin / tenant create | 建租户（`quotaSeats=2 quotaOrgUnits=2 quotaApiRpm=3`，DRAFT） |
+| 配额 | quota api availability | `GET /api/tenants/{id}/quota` 200 且含 seats/orgUnits/storageGb/apiRpm/status |
+| 配额 | quota fields | `seats.limit=2`、`orgUnits.limit=2`、`apiRpm.limit=3`、used/remaining/percent 齐全、`storageGb.used=null`、status=OK |
+| 组织 | org within quota / org over quota 409 | 在组织上限内创建成功；再加一个 → 409/429 `QUOTA_EXCEEDED`（message 含 used/limit） |
+| 席位 | account within quota / account over quota 409 | 在席位上限内创建成功；再加一个 → 409/429 `QUOTA_EXCEEDED` |
+| 导入 | import org quota enforcement | CSV 两行：重复 code → skipped；超限行 → failed；`imported=0` 且整批不中断 |
+| 导入 | import account quota enforcement | CSV 两行：重复 username → skipped；超限行 → failed；整批不中断 |
+| 更新 | quota update / quota reflects update | `PUT /api/tenants/{id}` 把 quotaSeats/quotaOrgUnits 提到 5；quota API 返回新 limit |
+| 更新后 | org create after quota update / account create after quota update | 提升后可继续创建第 3 个组织/账号 |
+| 生命周期 | tenant activation | submit + 审批至 `ACTIVE`（租户账号登录前提） |
+| RPM | rpm 429 | 租户 JWT 连续 6 次请求，出现 429/42901 即 PASS；网关未启用限流 → SKIP |
+| 无限额 | unlimited tenant create / activation / quota fields | 不传配额建租户 → quota limit 为 null/0 |
+| 无限额 | unlimited org not limited / account not limited | 无配额租户创 3 个组织/3 个账号均成功 |
+| 清理 | tenant cleanup | 软删两个测试租户 |
+
 ## 预期输出示例
 
 旧环境（无 v2 接口）：
@@ -502,6 +540,32 @@ PASS=2  FAIL=0  SKIP=29
 result: PASS
 ```
 
+v7 配额/用量环境：
+
+```
+[PASS] quota fields - seats 0/2 orgUnits 0/2 apiRpm=3 status=OK
+[PASS] org within quota - created=2 (orgUnits limit=2 used=0)
+[PASS] org over quota 409 - HTTP 409 code=42900 message=tenant org unit quota exceeded (used=2, limit=2)
+[PASS] import org quota enforcement - imported=0 skipped=1 failed=1 (batch not interrupted)
+[PASS] quota reflects update - seats.limit=5 orgUnits.limit=5 status=OK
+[PASS] rpm 429 - limited at 4:HTTP429/code42901
+[PASS] unlimited org not limited - created 3 org units without quota
+PASS=23  FAIL=0  SKIP=0
+result: PASS
+```
+
+旧环境（无 quota API）：
+
+```
+[PASS] preflight gateway
+[PASS] login admin
+[PASS] tenant create
+[SKIP] quota api availability - GET /api/tenants/{id}/quota -> HTTP 404 (v7 quota API not deployed)
+[SKIP] ... (其余 20 条)
+PASS=3  FAIL=0  SKIP=20
+result: PASS
+```
+
 ## 常见问题
 
 | 现象 | 处理 |
@@ -551,3 +615,11 @@ result: PASS
 | `mfa verify` FAIL（401） | 本机与后端时钟偏差超过 ±30s：同步系统时间（UTC）后重跑；脚本已尝试 ±1 窗口 |
 | `login mfaRequired` FAIL（无 challengeToken） | `/internal/auth/authenticate` 未返回 `mfaRequired`；确认租户账号 MFA 已 enabled 且 gateway 透传该响应 |
 | `mfa recovery login` SKIP | 恢复码流程按实现可选；若后端未支持恢复码，断言为 SKIP（不算失败），单次使用断言同样 SKIP |
+| `quota api availability` SKIP（404/500） | tenant-service v7 未部署 quota API：确认 `GET /api/tenants/{id}/quota` 返回 200，且 V8 迁移已执行（`quota_org_units`） |
+| `quota fields` FAIL（`quotaOrgUnits` 缺失/默认 50） | 建租户请求里的 `quotaOrgUnits` 未持久化：确认 V8 迁移回填与 `TenantCreateRequest` 已加字段 |
+| `org over quota 409`/`account over quota 409` FAIL（HTTP 200） | 强制点缺失：`POST org-units` 需校验 `usedOrgUnits >= limit`，`POST accounts` 需校验 `usedSeats >= limit`（409 `QUOTA_EXCEEDED`） |
+| `import org/account quota enforcement` FAIL（failed=0） | 导入未逐行检查配额：超限行应记 `failed`（不中断整批），重复行记 `skipped` |
+| `quota update`/`quota reflects update` FAIL | `PUT /api/tenants/{id}` 未接受 `quotaOrgUnits/quotaSeats`，或 quota API 仍用旧上限；确认 DRAFT 状态可更新 |
+| `rpm 429` SKIP | 网关租户 RPM 限流未启用（docs/17 §5 默认不启用）：确认 `quota_api_rpm=3` 且网关内部 quota 缓存生效 |
+| `rpm 429` FAIL（前 4 次未限流但后续出现） | 限流窗口/计数口径不同：检查是否只对携带 `tid` 的 JWT 计数、平台管理员不计数 |
+| `unlimited quota fields` FAIL（limit 非空） | 建租户未传配额时应存 NULL（<=0 也视为不限）；检查 `TenantCreateRequest` 默认值与回填逻辑 |

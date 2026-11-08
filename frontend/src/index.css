@@ -4257,6 +4257,131 @@ textarea.input {
   }
 }
 
+/* ------------------------------ v7：配额与用量 ------------------------------ */
+
+.quota-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quota-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quota-panel-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.quota-panel-title strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.quota-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quota-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.quota-item-exceeded {
+  border-color: #fecaca;
+  background: var(--red-bg);
+}
+
+.quota-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quota-label {
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.quota-percent {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quota-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #e5e5e5;
+}
+
+.quota-bar-unlimited {
+  background: #e5e5e5;
+}
+
+.quota-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--text);
+  transition: width 0.2s ease;
+}
+
+.quota-fill-warning {
+  background: var(--amber);
+}
+
+.quota-fill-exceeded {
+  background: var(--red);
+}
+
+.quota-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.quota-meta strong {
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.quota-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .quota-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ------------------------------ 工具类 ------------------------------ */
 
 .muted {

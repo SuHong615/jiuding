@@ -31,6 +31,7 @@ import com.suhong.jiuding.tenant.api.ResetPasswordResult;
 import com.suhong.jiuding.tenant.config.TenantProperties;
 import com.suhong.jiuding.tenant.domain.AccountRole;
 import com.suhong.jiuding.tenant.domain.AccountStatus;
+import com.suhong.jiuding.tenant.quota.QuotaGuard;
 import com.suhong.jiuding.tenant.repository.AccountRepository;
 import com.suhong.jiuding.tenant.repository.AccountRow;
 import com.suhong.jiuding.tenant.repository.LoginEventRepository;
@@ -76,6 +77,7 @@ public class AccountService {
     private final TenantAccess access;
     private final AuditService auditService;
     private final TenantProperties properties;
+    private final QuotaGuard quotaGuard;
 
     public AccountService(AccountRepository accounts,
                           OrgUnitRepository orgUnits,
@@ -84,7 +86,8 @@ public class AccountService {
                           PasswordHasher passwordHasher,
                           TenantAccess access,
                           AuditService auditService,
-                          TenantProperties properties) {
+                          TenantProperties properties,
+                          QuotaGuard quotaGuard) {
         this.accounts = accounts;
         this.orgUnits = orgUnits;
         this.tenants = tenants;
@@ -93,6 +96,7 @@ public class AccountService {
         this.access = access;
         this.auditService = auditService;
         this.properties = properties;
+        this.quotaGuard = quotaGuard;
     }
 
     // ------------------------------------------------------------------ queries
@@ -199,6 +203,8 @@ public class AccountService {
         String orgUnitId = resolveOrgUnitForWrite(scope, tenant.id(), request.orgUnitId());
         AccountRole role = AccountRole.parseOrDefault(request.role());
         assertCanGrant(scope, role);
+        // docs/17 section 4: seats quota is enforced over non deleted accounts.
+        quotaGuard.assertSeatsAvailable(tenant, accounts.countByTenant(tenant.id()));
 
         String initialPassword = Texts.blankToNull(request.initialPassword());
         String tempPassword = null;
