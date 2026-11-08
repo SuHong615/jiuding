@@ -142,12 +142,11 @@ public class AuthService {
         }
         String username = identityCache.usernameFor(principal.userId()).orElse(principal.username());
         try {
-            return tenantAuthClient.listSwitchableTenants(username, principal.userId(), principal.tenantId());
-        } catch (TenantAuthUnavailableException ex) {
-            log.warn("switchable tenant lookup unavailable ({}); degrading to the current tenant",
-                    ex.getMessage());
-            TenantSummary current = tenantAuthClient.currentTenantSummary(principal.tenantId());
-            return current == null ? List.of() : List.of(current);
+            return tenantAuthClient.listSwitchableTenants(principal.userId(), username, principal.tenantId());
+        } catch (TenantAuthUnavailableException | BizException ex) {
+            // v10.1: a missing/erroring candidate endpoint must not break the switcher.
+            log.warn("switchable tenant lookup failed ({}); returning empty list", ex.getMessage());
+            return List.of();
         }
     }
 
@@ -159,14 +158,14 @@ public class AuthService {
         }
         String username = identityCache.usernameFor(principal.userId()).orElse(principal.username());
         try {
-            TenantAuthResult result = tenantAuthClient.switchTenant(username, principal.userId(),
+            TenantAuthResult result = tenantAuthClient.switchTenant(principal.userId(), username,
                     tenantCode.trim(), principal.tenantId(), password);
             if (result.isTenantSelection()) {
                 throw BizException.invalid("tenantCode is required");
             }
             return loginFromTenantResult(result);
         } catch (TenantAuthUnavailableException ex) {
-            throw new BizException(ErrorCode.UPSTREAM_ERROR, "tenant authentication service unavailable");
+            throw new BizException(ErrorCode.UNAUTHORIZED, "invalid credentials");
         }
     }
 

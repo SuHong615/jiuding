@@ -47,6 +47,7 @@ public class PasswordHasher {
     static final int MAX_LENGTH = 128;
 
     private static final String ALGORITHM = "PBKDF2WithHmacSHA256";
+    private static final String FINGERPRINT_PEPPER = "tenancy-center-password-fingerprint-v1";
     private static final String UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
     private static final String LOWER = "abcdefghijkmnpqrstuvwxyz";
     private static final String DIGITS = "23456789";
@@ -74,6 +75,25 @@ public class PasswordHasher {
             return MessageDigest.isEqual(expected, actual);
         } catch (IllegalArgumentException ex) {
             return false;
+        }
+    }
+
+    /**
+     * Deterministic equality fingerprint used only for multi-tenant membership checks
+     * (docs/20 section 3): two tenant accounts share a person when their plaintext passwords
+     * are equal even though the PBKDF2 salts differ. Never used for authentication.
+     */
+    public String fingerprint(String password) {
+        if (password == null) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] value = digest.digest((FINGERPRINT_PEPPER + ":" + password)
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(value);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is not available", ex);
         }
     }
 

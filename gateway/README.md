@@ -84,11 +84,12 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
   下游不可用/账号不存在时回退到本地预置用户目录（仅兼容，任何 API 都不暴露预置列表）。
 - `tenantCode` 为空：平台账号 → 本地预置 → 租户成员解析；同一 username+密码命中多个租户时返回
   `200 {mfaRequired:false, tenantSelectionRequired:true, tenants:[{tenantId,tenantCode,name}]}`；显式 `tenantCode` 直接走租户认证。
-- `/api/auth/tenants` 使用当前 JWT 身份查询可切换租户：平台账号/无租户身份返回 `[]`；租户账号优先调用
-  `GET /internal/auth/tenants?username=&userId=&currentTenantId=`，当前 tenant-service v10 尚未提供该接口时降级为「当前租户」单条（不返回 502）。
-- `/api/auth/switch-tenant {tenantCode, password?}` 调用 tenant-service
-  `POST /internal/auth/switch-tenant`（实际契约 `{username,tenantCode,password}`，网关额外携带 `userId/currentTenantId` 以容忍未来实现）；
-  账号 username 由登录时的内存映射还原（JWT 只有 accountId+displayName）；未提供 password 时由 tenant-service 判定（当前实现要求 password）。
+- `/api/auth/tenants`（v10.1）使用当前 JWT 的 `accountId/username/currentTenantId` 调 tenant-service
+  `GET /internal/auth/tenants?accountId=&username=&currentTenantId=`；平台账号/无租户身份、或下游失败均返回 `200 []`（不返回 502）。
+- `/api/auth/switch-tenant {tenantCode, password?}`（v10.1）：未提供 password 时走免密新契约
+  `POST /internal/auth/switch-tenant {currentAccountId, tenantCode}`（后端校验目标租户同名且 password_hash 相同）；提供 password 时回退旧契约
+  `{username, tenantCode, password}`；成功签发目标租户 JWT（保留 roles/orgUnitId），失败 401。账号 username 由登录时的
+  [TenantIdentityCache] 内存映射还原（JWT 只有 accountId+displayName），旧契约回退时使用。
 
 ## 动态 SSO Provider（v10，docs/20 §3）
 

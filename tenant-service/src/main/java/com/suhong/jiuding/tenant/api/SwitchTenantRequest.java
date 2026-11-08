@@ -20,9 +20,18 @@ package com.suhong.jiuding.tenant.api;
 /**
  * Body of {@code POST /internal/auth/switch-tenant} (docs/20 section 3).
  *
- * <p>The gateway forwards the credentials of the currently signed-in account together with
- * the target tenant code; tenant-service validates that the target tenant contains the same
- * username and password hash before the gateway issues a new tenant-scoped JWT.
+ * <p>Passwordless form: {@code {currentAccountId, tenantCode}} — tenant-service validates that
+ * the current account is ACTIVE and the target tenant contains the same username with the
+ * same password hash, then returns the target tenant principal (or its MFA challenge).
+ *
+ * <p>Legacy form: {@code {username, tenantCode, password}} remains supported so older gateway
+ * builds keep working; both forms share the same validation and MFA behaviour.
  */
-public record SwitchTenantRequest(String username, String tenantCode, String password) {
+public record SwitchTenantRequest(String username, String tenantCode, String password,
+                                  String currentAccountId) {
+
+    /** Legacy three-argument form kept for callers that build the DTO directly. */
+    public SwitchTenantRequest(String username, String tenantCode, String password) {
+        this(username, tenantCode, password, null);
+    }
 }

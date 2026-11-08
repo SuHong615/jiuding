@@ -129,11 +129,12 @@ public class TenantAuthClient {
      * Tenants that the current identity can switch to (same username + identical password
      * hash across ACTIVE tenant memberships, docs/20 §3).
      */
-    public List<TenantSummary> listSwitchableTenants(String username, String userId, String currentTenantId) {
+    public List<TenantSummary> listSwitchableTenants(String accountId, String username,
+                                                     String currentTenantId) {
         StringBuilder url = new StringBuilder(trimSlash(properties.getTenantServiceUrl())).append(TENANTS_PATH);
         boolean first = true;
+        first = appendQuery(url, first, "accountId", accountId);
         first = appendQuery(url, first, "username", username);
-        first = appendQuery(url, first, "userId", userId);
         first = appendQuery(url, first, "currentTenantId", currentTenantId);
         HttpRequest request = HttpRequest.newBuilder(URI.create(url.toString()))
                 .timeout(Duration.ofMillis(properties.getRequestTimeoutMs()))
@@ -160,18 +161,24 @@ public class TenantAuthClient {
      * Re-issues the principal of the current identity inside another tenant. The target
      * membership is validated by tenant-service (same username + identical password hash).
      */
-    public TenantAuthResult switchTenant(String username, String userId, String tenantCode,
+    public TenantAuthResult switchTenant(String accountId, String username, String tenantCode,
                                          String currentTenantId, String password) {
         ObjectNode body = objectMapper.createObjectNode();
-        body.put("username", username);
-        body.put("userId", userId);
-        // tenant-service v10 switch request is {username,tenantCode,password}; the extra
-        // userId/currentTenantId fields are tolerated by Jackson and kept for forward
-        // compatibility with a hash-equality based switch implementation.
         body.put("tenantCode", tenantCode);
-        body.put("currentTenantId", currentTenantId == null ? "" : currentTenantId);
-        if (password != null && !password.isEmpty()) {
+        if (password == null || password.isEmpty()) {
+            // v10.1 password-less contract: tenant-service validates the target membership
+            // against the current account's username + identical password hash.
+            body.put("currentAccountId", accountId);
+            if (currentTenantId != null && !currentTenantId.isBlank()) {
+                body.put("currentTenantId", currentTenantId);
+            }
+        } else {
+            // Legacy v10 contract {username,tenantCode,password} (kept for compatibility).
+            body.put("username", username);
             body.put("password", password);
+            if (accountId != null && !accountId.isBlank()) {
+                body.put("currentAccountId", accountId);
+            }
         }
 
         HttpResponse<String> response = sendJson(SWITCH_TENANT_PATH, body, null, null);

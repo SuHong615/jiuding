@@ -22,10 +22,12 @@ import com.suhong.jiuding.common.error.ErrorCode;
 import com.suhong.jiuding.tenant.api.AuthenticateRequest;
 import com.suhong.jiuding.tenant.api.AuthenticateResponse;
 import com.suhong.jiuding.tenant.api.SwitchTenantRequest;
+import com.suhong.jiuding.tenant.api.TenantChoiceView;
 import com.suhong.jiuding.tenant.domain.AccountStatus;
 import com.suhong.jiuding.tenant.domain.TenantStatus;
 import com.suhong.jiuding.tenant.mfa.MfaAuthenticateRequest;
 import com.suhong.jiuding.tenant.mfa.MfaService;
+import com.suhong.jiuding.tenant.platformuser.PlatformUserRepository;
 import com.suhong.jiuding.tenant.repository.AccountRepository;
 import com.suhong.jiuding.tenant.repository.AccountRow;
 import com.suhong.jiuding.tenant.repository.LoginEventRepository;
@@ -46,6 +48,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -79,6 +82,7 @@ public class AccountAuthService {
     private final PasswordHasher passwordHasher;
     private final AuditService auditService;
     private final MfaService mfaService;
+    private final PlatformUserRepository platformUsers;
 
     public AccountAuthService(TenantRepository tenants,
                               AccountRepository accounts,
@@ -86,7 +90,8 @@ public class AccountAuthService {
                               LoginEventRepository loginEvents,
                               PasswordHasher passwordHasher,
                               AuditService auditService,
-                              MfaService mfaService) {
+                              MfaService mfaService,
+                              PlatformUserRepository platformUsers) {
         this.tenants = tenants;
         this.accounts = accounts;
         this.orgUnits = orgUnits;
@@ -94,6 +99,7 @@ public class AccountAuthService {
         this.passwordHasher = passwordHasher;
         this.auditService = auditService;
         this.mfaService = mfaService;
+        this.platformUsers = platformUsers;
     }
 
     /** Backwards compatible entry point (no request metadata available). */
@@ -154,18 +160,36 @@ public class AccountAuthService {
 
     /**
      * Switch to another tenant of the same person (docs/20 section 3): the target tenant must
-     * contain the same username with the same password; MFA stays enabled for the new tenant.
+     * contain the same username with the same password hash; MFA stays enabled for the new
+     * tenant.
+     *
+     * <p>Passwordless form {@code {currentAccountId, tenantCode}} looks the current account up
+     * across tenants; the legacy {@code {username, tenantCode, password}} form remains
+     * supported for older gateways.
      */
     public AuthenticateResponse switchTenant(SwitchTenantRequest request, String ip, String userAgent) {
         String tenantCode = Texts.blankToNull(request == null ? null : request.tenantCode());
+        String currentAccountId = Texts.blankToNull(request == null ? null : request.currentAccountId());
+        String safeIp = Texts.truncate(Texts.blankToNull(ip), 64);
+        String safeUa = Texts.truncate(Texts.blankToNull(userAgent), 256);
+
+        if (currentAccountId != null) {
+            AccountRow source = accounts.findAnyById(currentAccountId).orElse(null);
+            if (source == null || !AccountStatus.ACTIVE.name().equals(source.status())) {
+                throw invalidCredentials();
+            }
+            if (tenantCode == null) {
+                throw invalidCredentials();
+            }
+            return switchToTenant(source, tenantCode, safeIp, safeUa);
+        }
+
         String username = passwordHasher.normalizeUsername(request == null ? null : request.username());
         String password = request == null ? null : request.password();
         if (tenantCode == null || username == null || username.isBlank()
                 || password == null || password.isEmpty()) {
             throw invalidCredentials();
         }
-        String safeIp = Texts.truncate(Texts.blankToNull(ip), 64);
-        String safeUa = Texts.truncate(Texts.blankToNull(userAgent), 256);
         TenantRow tenant = tenants.findByCode(tenantCode).orElse(null);
         if (tenant == null || tenant.deletedAt() != null
                 || !TenantStatus.ACTIVE.name().equals(tenant.status())) {
@@ -181,6 +205,105 @@ public class AccountAuthService {
             throw invalidCredentials();
         }
         return finalizeLogin(tenant, account, safeIp, safeUa);
+    }
+
+    /**
+     * Switchable tenants for the current session (docs/20 section 3,
+     * {@code GET /internal/auth/tenants}): ACTIVE tenants that contain the same username with
+     * exactly the same password hash, excluding the current tenant. Platform accounts (or
+     * unknown sessions) yield an empty list.
+     */
+    public List<TenantChoiceView> switchableTenants(String accountId, String username,
+                                                    String currentTenantId) {
+        AccountRow source = resolveSourceAccount(accountId, username, currentTenantId);
+        if (source == null || !AccountStatus.ACTIVE.name().equals(source.status())) {
+            return List.of();
+        }
+        String currentKey = Texts.blankToNull(currentTenantId);
+        TenantRow currentTenant = currentKey == null ? null : resolveTenant(currentKey);
+        String currentId = currentTenant == null ? source.tenantId() : currentTenant.id();
+        if (currentTenant == null && currentKey != null
+                && !currentKey.equals(source.tenantId())) {
+            // A supplied currentTenantId that does not resolve to a real tenant still excludes
+            // the literal value to avoid listing the caller's own tenant as switchable.
+            currentId = currentKey;
+        }
+        List<TenantChoiceView> result = new ArrayList<>();
+        for (TenantRow tenant : tenants.findActive(1000)) {
+            if (tenant.id().equals(currentId) || tenant.tenantCode().equals(currentId)) {
+                continue;
+            }
+            AccountRow candidate = accounts.findByUsername(tenant.id(), source.username()).orElse(null);
+            if (candidate == null || candidate.deletedAt() != null
+                    || !AccountStatus.ACTIVE.name().equals(candidate.status())) {
+                continue;
+            }
+            if (!samePassword(source, candidate)) {
+                continue;
+            }
+            result.add(new TenantChoiceView(tenant.id(), tenant.tenantCode(), tenant.name()));
+        }
+        result.sort(Comparator.comparing(TenantChoiceView::tenantCode));
+        return result;
+    }
+
+    private AuthenticateResponse switchToTenant(AccountRow source, String tenantCode,
+                                                String ip, String userAgent) {
+        TenantRow tenant = resolveTenant(tenantCode);
+        if (tenant == null || tenant.deletedAt() != null
+                || !TenantStatus.ACTIVE.name().equals(tenant.status())) {
+            throw invalidCredentials();
+        }
+        AccountRow target = accounts.findByUsername(tenant.id(), source.username()).orElse(null);
+        if (target == null || target.deletedAt() != null
+                || !AccountStatus.ACTIVE.name().equals(target.status())
+                || !samePassword(source, target)) {
+            throw invalidCredentials();
+        }
+        return finalizeLogin(tenant, target, ip, userAgent);
+    }
+
+    private AccountRow resolveSourceAccount(String accountId, String username,
+                                            String currentTenantId) {
+        String id = Texts.blankToNull(accountId);
+        if (id != null) {
+            if (platformUsers.findById(id).isPresent()) {
+                return null; // platform accounts cannot switch into a tenant
+            }
+            return accounts.findAnyById(id).orElse(null);
+        }
+        String normalized = passwordHasher.normalizeUsername(username);
+        if (normalized == null || normalized.isBlank()) {
+            return null;
+        }
+        if (platformUsers.findByUsername(normalized).isPresent()) {
+            return null; // platform accounts cannot switch into a tenant
+        }
+        String tenantKey = Texts.blankToNull(currentTenantId);
+        if (tenantKey == null) {
+            return null;
+        }
+        TenantRow tenant = resolveTenant(tenantKey);
+        return tenant == null ? null
+                : accounts.findByUsername(tenant.id(), normalized).orElse(null);
+    }
+
+    private TenantRow resolveTenant(String idOrCode) {
+        String key = Texts.blankToNull(idOrCode);
+        if (key == null) {
+            return null;
+        }
+        return tenants.findById(key).orElseGet(() -> tenants.findByCode(key).orElse(null));
+    }
+
+    private boolean samePassword(AccountRow left, AccountRow right) {
+        String leftFingerprint = left.passwordFingerprint();
+        String rightFingerprint = right.passwordFingerprint();
+        if (leftFingerprint != null && rightFingerprint != null) {
+            return leftFingerprint.equals(rightFingerprint);
+        }
+        return Objects.equals(left.passwordHash(), right.passwordHash())
+                && Objects.equals(left.passwordSalt(), right.passwordSalt());
     }
 
     private AuthenticateResponse authenticateMultiTenant(String username, String password,

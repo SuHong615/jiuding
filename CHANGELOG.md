@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- v10 企业 SSO Provider 配置/动态 OIDC、平台账号管理、多租户登录选择与免密切换、MCP 控制台重构、租户生命周期工作流视图
 - v9 权限强制层 Phase 1：`@RequirePermission` + 拦截器（roles→role_permissions 缓存、自定义角色即时生效、无权限 403）
 - v8 租户数据导出（默认脱敏/平台明文/审计）与离户（TERMINATED+软删+审计）；CLI `tenant export/offboard`；E2E v8
 - v7 配额与用量：席位/组织配额强制（409 `QUOTA_EXCEEDED`）、`GET /api/tenants/{id}/quota` 用量 API、网关按租户 API RPM 限流（429/42901）、控制台配额卡片

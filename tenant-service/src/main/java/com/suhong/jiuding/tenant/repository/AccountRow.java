@@ -37,6 +37,7 @@ public record AccountRow(
         String status,
         String passwordHash,
         String passwordSalt,
+        String passwordFingerprint,
         boolean mustChangePassword,
         int failedAttempts,
         LocalDateTime lastLoginAt,
@@ -45,4 +46,29 @@ public record AccountRow(
         LocalDateTime updatedAt,
         LocalDateTime deletedAt,
         long version) {
+
+    /** Backwards compatible constructor for callers that do not track the fingerprint yet. */
+    public AccountRow(String id,
+                      String tenantId,
+                      String orgUnitId,
+                      String username,
+                      String displayName,
+                      String email,
+                      String phone,
+                      String role,
+                      String status,
+                      String passwordHash,
+                      String passwordSalt,
+                      boolean mustChangePassword,
+                      int failedAttempts,
+                      LocalDateTime lastLoginAt,
+                      String createdBy,
+                      LocalDateTime createdAt,
+                      LocalDateTime updatedAt,
+                      LocalDateTime deletedAt,
+                      long version) {
+        this(id, tenantId, orgUnitId, username, displayName, email, phone, role, status,
+                passwordHash, passwordSalt, null, mustChangePassword, failedAttempts, lastLoginAt,
+                createdBy, createdAt, updatedAt, deletedAt, version);
+    }
 }

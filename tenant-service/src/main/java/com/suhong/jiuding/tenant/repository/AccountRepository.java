@@ -41,9 +41,9 @@ public class AccountRepository {
 
     private static final List<String> COLUMN_NAMES = List.of(
             "id", "tenant_id", "org_unit_id", "username", "display_name", "email", "phone",
-            "role", "status", "password_hash", "password_salt", "must_change_password",
-            "failed_attempts", "last_login_at", "created_by", "created_at", "updated_at",
-            "deleted_at", "version");
+            "role", "status", "password_hash", "password_salt", "password_fingerprint",
+            "must_change_password", "failed_attempts", "last_login_at", "created_by",
+            "created_at", "updated_at", "deleted_at", "version");
 
     private static final String COLUMNS = String.join(", ", COLUMN_NAMES);
     private static final String INSERT_SQL = "INSERT INTO accounts (" + COLUMNS + ") VALUES ("
@@ -61,6 +61,7 @@ public class AccountRepository {
             rs.getString("status"),
             rs.getString("password_hash"),
             rs.getString("password_salt"),
+            rs.getString("password_fingerprint"),
             rs.getBoolean("must_change_password"),
             rs.getInt("failed_attempts"),
             rs.getObject("last_login_at", java.time.LocalDateTime.class),
@@ -80,6 +81,17 @@ public class AccountRepository {
         List<AccountRow> rows = jdbc.query(
                 "SELECT " + COLUMNS + " FROM accounts WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL",
                 ROW_MAPPER, tenantId, id);
+        return rows.stream().findFirst();
+    }
+
+    /**
+     * Looks an account up across tenants by primary key (multi-tenant switching, docs/20
+     * section 3); soft deleted rows are excluded.
+     */
+    public Optional<AccountRow> findAnyById(String id) {
+        List<AccountRow> rows = jdbc.query(
+                "SELECT " + COLUMNS + " FROM accounts WHERE id = ? AND deleted_at IS NULL",
+                ROW_MAPPER, id);
         return rows.stream().findFirst();
     }
 
@@ -190,8 +202,9 @@ public class AccountRepository {
         return jdbc.update(INSERT_SQL,
                 row.id(), row.tenantId(), row.orgUnitId(), row.username(), row.displayName(),
                 row.email(), row.phone(), row.role(), row.status(), row.passwordHash(),
-                row.passwordSalt(), row.mustChangePassword(), row.failedAttempts(), row.lastLoginAt(),
-                row.createdBy(), row.createdAt(), row.updatedAt(), row.deletedAt(), row.version());
+                row.passwordSalt(), row.passwordFingerprint(), row.mustChangePassword(),
+                row.failedAttempts(), row.lastLoginAt(), row.createdBy(), row.createdAt(),
+                row.updatedAt(), row.deletedAt(), row.version());
     }
 
     /** Optimistic update; @return rows changed (0 = version/id guard failed). */

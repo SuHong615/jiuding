@@ -132,7 +132,7 @@ class GatewayV10Test {
                 }
             }
             case "/internal/auth/switch-tenant" -> {
-                if (body.contains("\"tenantCode\":\"beta\"") && body.contains("\"username\":")) {
+                if (body.contains("\"tenantCode\":\"beta\"")) {
                     StubServer.respond(exchange, 200, "application/json;charset=UTF-8",
                             "{\"code\":0,\"message\":\"ok\",\"data\":{\"accountId\":\"acc-beta\","
                                     + "\"tenantId\":\"t-beta\",\"tenantCode\":\"beta\",\"username\":\"alice\","
@@ -278,6 +278,8 @@ class GatewayV10Test {
         assertThat(recorded).isNotNull();
         assertThat(recorded.header("x-internal-token")).isEqualTo("dev-internal-token");
         assertThat(recorded.query()).contains("currentTenantId=t-acme");
+        assertThat(recorded.query()).contains("accountId=acc-acme");
+        assertThat(recorded.query()).contains("username=alice");
     }
 
     @Test
@@ -301,11 +303,33 @@ class GatewayV10Test {
 
         StubServer.Recorded recorded = lastRequest("/internal/auth/switch-tenant");
         assertThat(recorded.body()).contains("\"tenantCode\":\"beta\"");
-        assertThat(recorded.body()).contains("\"currentTenantId\":\"t-acme\"");
-        // identity-svc contract: {username, tenantCode, password}; extra fields tolerated.
+        // Legacy v10 contract when a password is supplied: {username, tenantCode, password}.
         assertThat(recorded.body()).contains("\"username\":\"alice\"");
         assertThat(recorded.body()).contains("\"password\":\"Alice@123\"");
-        assertThat(recorded.body()).contains("\"userId\":\"acc-acme\"");
+        assertThat(recorded.body()).contains("\"currentAccountId\":\"acc-acme\"");
+    }
+
+    @Test
+    void passwordLessSwitchUsesCurrentAccountIdContract() throws Exception {
+        String token = tenantToken();
+        MvcResult result = mockMvc.perform(post("/api/auth/switch-tenant")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tenantCode\":\"beta\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andExpect(jsonPath("$.data.principal.tenantId").value("t-beta"))
+                .andReturn();
+        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        Principal principal = jwtService.parse(body.path("data").path("token").asText());
+        assertThat(principal.tenantId()).isEqualTo("t-beta");
+
+        StubServer.Recorded recorded = lastRequest("/internal/auth/switch-tenant");
+        assertThat(recorded.body()).contains("\"currentAccountId\":\"acc-acme\"");
+        assertThat(recorded.body()).contains("\"tenantCode\":\"beta\"");
+        // v10.1 password-less payload contains no credentials.
+        assertThat(recorded.body()).doesNotContain("\"password\"");
+        assertThat(recorded.body()).doesNotContain("\"username\"");
     }
 
     @Test
@@ -324,14 +348,13 @@ class GatewayV10Test {
     }
 
     @Test
-    void switchableTenantsDegradesToCurrentTenantWhenCandidateEndpointMissing() throws Exception {
+    void switchableTenantsDegradeToEmptyListWhenCandidateEndpointFails() throws Exception {
         CANDIDATES_MODE.set("500");
         String token = tenantToken();
         mockMvc.perform(get("/api/auth/tenants").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].tenantId").value("t-acme"))
-                .andExpect(jsonPath("$.data[0].tenantCode").value("acme"));
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.length()").value(0));
     }
 
     @Test

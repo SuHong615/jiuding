@@ -19,6 +19,7 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 | `e2e-v6b.ps1` | **v6 阶段 B SCIM E2E**（docs/16 §7.1）：SCIM token 创建（明文一次）/撤销、无 token 与坏 token 401、ServiceProviderConfig 200；Users POST/GET/filter/GET id/PATCH active=false/PUT displayName/分页/DELETE；Groups POST/GET/filter/PATCH 改名+成员/DELETE（204 或 409 均接受）；SCIM Error schema（401/404/409）；清理撤销 token + 软删租户 |
 | `e2e-v7.ps1` | **v7 配额/用量/RPM E2E**（docs/17）：建租户（quotaSeats=2/quotaOrgUnits=2/quotaApiRpm=3）→ `GET /api/tenants/{id}/quota` 字段/状态 → 组织与账号按上限创建、超限 409 → CSV 导入（重复行 skipped + 超限行 failed，不中断）→ PUT 提升配额并校验 → 租户 JWT 网关 RPM 第 4 次 429/42901（未实现 SKIP）→ 无配额租户不受限 → 软删租户 |
 | `e2e-v8.ps1` | **v8 导出/离户 E2E**（docs/18）：数据准备（组织/账号/评级/审计）→ `export?mask=true` 结构与 PII 掩码 + `Content-Disposition` → 默认 mask、TENANT_ADMIN 只读掩码、admin `mask=false` 明文、非平台 403 → MEMBER/ORG_ADMIN 403 → `TENANT_EXPORTED` 审计 → 离户（reason 必填、仅平台管理员、ACTIVE/SUSPENDED、TERMINATED+deletedAt）→ 离户后 detail/export 404、重复离户 404/409、`TENANT_OFFBOARDED` 审计探测 → 清理 |
+| `e2e-v10.ps1` | **v10 平台身份/SSO/多租户/工作流 E2E**（docs/20）：平台用户 CRUD/登录/禁用/重置/删除；SSO Provider 创建/列表不泄露 secret/启停/不可达 issuer test 失败/公开列表只含 enabled/删除；双租户同用户名+密码账号 → 无 tenantCode 登录返回 `tenantSelectionRequired`（2 项）→ 带 tenantCode 登录 → `/api/auth/tenants` 可切换列表 → `/api/auth/switch-tenant` 换发 JWT；`/api/workflows/tenant-lifecycle` 状态/活动/Skill 映射/迁移；清理 |
 | `mcp-smoke.ps1` | v1 MCP 协议冒烟：`initialize` / `notifications/initialized` / `ping` / `tools/list`（14 工具）/ `tools/call` / 未知方法 `-32601` / `GET /mcp/info` |
 | `mcp-smoke-v2.ps1` | **v2 MCP 冒烟**：`tools/list` 数量（14 基础工具 + 8 个 v2 工具 = 22）+ `org.tree` / `account.list` / `rating.list` 调用断言 |
 | `README.md` | 本文件 |
@@ -54,6 +55,11 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 13. `e2e-v8.ps1` 依赖 `docs/18` 的导出（`GET /api/tenants/{id}/export?mask=`）与离户（`POST .../offboard`）：
     **export 路由缺失时整体 SKIP**；离户后数据会被软删，`TENANT_OFFBOARDED` 审计若没有可读的
     审计 API（租户审计/平台审计）则该条断言为 SKIP（不算失败）。
+14. `e2e-v10.ps1` 依赖 `docs/20` 的平台用户、SSO Provider、多租户登录/切换与工作流视图：
+    `/api/workflows/tenant-lifecycle` 与 `/api/platform/users` 均缺失时整体 SKIP；网关对启用 SSO Provider
+    有 60s 缓存，脚本在禁用后会轮询公开列表直至缓存过期（最长 75s）；`/api/auth/tenants` 的可切换候选按
+    `password_hash` 匹配（含随机盐），同密码但独立创建的账号可能不被列出，该条按实测降级 SKIP 并在
+    detail 注明契约缺口。
 
 ## 执行
 
@@ -89,6 +95,9 @@ pwsh ./tests/e2e-v7.ps1 -BaseUrl http://localhost:18080
 # v8 租户导出/离户 E2E（掩码/明文/权限/审计→离户→404/重复离户）
 pwsh ./tests/e2e-v8.ps1 -BaseUrl http://localhost:18080
 
+# v10 平台用户/SSO/多租户/工作流 E2E
+pwsh ./tests/e2e-v10.ps1 -BaseUrl http://localhost:18080
+
 # 指定 k8s 端口
 powershell -File ./tests/e2e-v2.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v3.ps1 -BaseUrl http://localhost:30080
@@ -99,6 +108,7 @@ powershell -File ./tests/e2e-v6.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v6b.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v7.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v8.ps1 -BaseUrl http://localhost:30080
+powershell -File ./tests/e2e-v10.ps1 -BaseUrl http://localhost:30080
 
 # MCP 协议冒烟
 pwsh ./tests/mcp-smoke.ps1 -BaseUrl http://localhost:18080 -ApiKey dev-mcp-key
@@ -110,8 +120,8 @@ pwsh ./scripts/verify.ps1
 pwsh ./scripts/verify.ps1 -TenantServiceUrl http://localhost:8081
 ```
 
-建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `e2e-v8.ps1` → `scripts/verify.ps1`。
-`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7/v8 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
+建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `e2e-v8.ps1` → `e2e-v10.ps1` → `scripts/verify.ps1`。
+`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7/v8/v10 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
 
 ## 版本能力门（v2 rollout 期间的关键行为）
 
@@ -219,6 +229,21 @@ OIDC 未部署 → `[SKIP] v6 api availability - v6 API not deployed; GET /api/a
 `scripts/verify.ps1` 的 `Test-ExportAvailable` 复用同一探测：取列表里第一个租户调用 export；没有租户时
 `SKIP 'no tenant available to probe...'`，不创建数据。离户后的 `TENANT_OFFBOARDED` 审计若没有可读审计
 API（租户审计/平台审计）则该条为 SKIP。
+
+### v10 平台身份/SSO/多租户能力门
+
+`e2e-v10.ps1` 登录后、创建数据前探测：
+
+1. `GET /api/workflows/tenant-lifecycle`（admin JWT）：200 且 `data.states` 存在；
+2. `GET /api/platform/users`（admin JWT）：200。
+
+两者均缺失 → `[SKIP] v10 api availability - v10 API not deployed; ...`，其余 31 条断言全部 `SKIP`，退出码 0。
+`scripts/verify.ps1` 的 `Test-V10Available` 复用同一探测，输出 `E2E v10 chain - SKIP <缺失标记>` 或
+`E2E v10 chain - PASS platform users + SSO providers + tenant selection/switch + workflow`。
+
+已知契约缺口：`/api/auth/tenants` 的候选按 `password_hash`（含随机盐）匹配，两个租户分别用相同明文密码创建
+账号时盐不同，候选可能只返回当前租户；脚本在「无其它租户」时将该条降级为 SKIP 并在 detail 记录，
+`switch-tenant` 仍单独断言（当前后端可成功换发 JWT）。
 
 ## 断言与退出码
 
@@ -450,6 +475,26 @@ API（租户审计/平台审计）则该条为 SKIP。
 | 审计 | offboard audit TENANT_OFFBOARDED | 通过租户审计/平台审计探测；无读取 API 时 SKIP |
 | 清理 | tenant cleanup | 软删 A、C（B 已离户） |
 
+### e2e-v10.ps1 断言清单（34 条，docs/20）
+
+| 分组 | 断言 | 说明 |
+|---|---|---|
+| 前置 | preflight gateway / login admin / v10 api availability | workflow + platform users 探测 |
+| 平台用户 | platform user create / list / login | 创建（临时密码一次）、列表、用新账号登录（roles 含 APPROVER） |
+| 平台用户 | disable / disabled login 401 / re-enable | PUT DISABLED → 登录 401 → PUT ACTIVE |
+| 平台用户 | reset password / login after reset / delete / deleted login 401 | 重置返回一次性临时密码；删除后登录 401 |
+| SSO | sso provider create / list no secret | 创建（不可达 issuer、enabled=false）；列表含 `hasClientSecret` 但不返回 secret |
+| SSO | enable / public list enabled / test unreachable / disable / public list disabled | 公开列表只含 enabled；不可达 issuer test → 400/40001；禁用后轮询公开列表（网关 60s 缓存）直至移除 |
+| SSO | delete | 删除 Provider |
+| 多租户 | tenant A/B create+activation | 两个 ACTIVE 租户 |
+| 多租户 | shared account A/B create | 同 username + 同 initialPassword 账号 |
+| 多租户 | login tenant selection required | 无 tenantCode 登录 → `tenantSelectionRequired=true` 且 2 个候选项 |
+| 多租户 | login with tenantCode | 显式 tenantCode 登录，principal.tenantId 正确 |
+| 多租户 | auth tenants list contains other | `/api/auth/tenants` 至少含另一租户（hash+salt 限制时 SKIP 并注明） |
+| 多租户 | switch tenant | `/api/auth/switch-tenant` 换发目标租户 JWT，tenantId 变化 |
+| 工作流 | workflow structure / activities map skills | states≥8、transitions>0；activities 均映射 skillId |
+| 清理 | tenant cleanup | 软删两个租户 |
+
 ## 预期输出示例
 
 旧环境（无 v2 接口）：
@@ -639,6 +684,33 @@ PASS=3  FAIL=0  SKIP=25
 result: PASS
 ```
 
+v10 平台身份环境：
+
+```
+[PASS] v10 api availability - workflow HTTP 200 users HTTP 200
+[PASS] platform user create - id=... tempPasswordLen=16
+[PASS] platform user disabled login 401 - HTTP 401
+[PASS] sso provider list no secret - providers=1 hasClientSecret=true, secret not exposed
+[PASS] sso provider public list disabled - disabled provider not exposed (gateway provider cache expired after ~0s)
+[PASS] login tenant selection required - tenants=e2e-v10-a-...,e2e-v10-b-...
+[SKIP] auth tenants list contains other - docs/20 section 3 lists candidates by identical password_hash (salt included); ...
+[PASS] switch tenant - switch to tenantB (...) succeeded
+[PASS] workflow structure - states=10 transitions=29
+PASS=33  FAIL=0  SKIP=1
+result: PASS
+```
+
+旧环境（无 v10 API）：
+
+```
+[PASS] preflight gateway
+[PASS] login admin
+[SKIP] v10 api availability - v10 API not deployed; workflow HTTP 500, platform users HTTP 500
+[SKIP] ... (其余 31 条)
+PASS=2  FAIL=0  SKIP=32
+result: PASS
+```
+
 ## 常见问题
 
 | 现象 | 处理 |
@@ -696,3 +768,27 @@ result: PASS
 | `rpm 429` SKIP | 网关租户 RPM 限流未启用（docs/17 §5 默认不启用）：确认 `quota_api_rpm=3` 且网关内部 quota 缓存生效 |
 | `rpm 429` FAIL（前 4 次未限流但后续出现） | 限流窗口/计数口径不同：检查是否只对携带 `tid` 的 JWT 计数、平台管理员不计数 |
 | `unlimited quota fields` FAIL（limit 非空） | 建租户未传配额时应存 NULL（<=0 也视为不限）；检查 `TenantCreateRequest` 默认值与回填逻辑 |
+| `export api availability` SKIP（404/500） | tenant-service v8 导出接口未部署：确认 `GET /api/tenants/{id}/export?mask=true` 返回 JSON bundle 且带 `Content-Disposition` |
+| `export masked structure` FAIL（缺 orgUnits/accounts/rating/audits） | 导出 bundle 字段不全：按 docs/18 §2 补齐 `tenant/orgUnits/accounts/rating/audits`，rating 含 current/history |
+| `export masked pii` FAIL | 掩码未生效或明文泄漏：确认默认 `mask=true`、`PiiMask` 作用于 email/phone，且导出正文不含原始 PII |
+| `export unmasked admin` FAIL（仍掩码） | 平台管理员 `mask=false` 未返回明文：检查权限分支与 `mask` 参数解析 |
+| `export unmasked tenant admin`/`auditor` FAIL（200 明文） | `mask=false` 未限制为 PLATFORM_ADMIN：非平台管理员应 403 或保持掩码 |
+| `export forbidden member 403`/`org admin 403` FAIL（200） | 导出权限未收紧：仅 PLATFORM_ADMIN / TENANT_ADMIN / AUDITOR 可读，ORG_ADMIN/MEMBER 403 |
+| `export audit TENANT_EXPORTED` FAIL | 导出未写审计：每次导出应记录 `TENANT_EXPORTED`（mask 与条目数，不含 PII） |
+| `offboard reason required` FAIL（空 reason 被接受） | 离户 `reason` 未校验：需 400/40001 且租户状态不变 |
+| `offboard success` FAIL | 离户未返回 `TERMINATED` + `deletedAt`：检查 terminate→软删→审计流程 |
+| `tenant detail after offboard 404`/`export after offboard 404` FAIL | 离户后未软删（仍可读）：软删后详情与导出一律 404 |
+| `offboard repeated` FAIL（非 404/409） | 重复离户应 404 或 409，不允许 200 或 500 |
+| `offboard audit TENANT_OFFBOARDED` SKIP | 软删后无审计读取 API（租户审计 404、无平台审计接口）：审计已在服务端记录，必要时通过 DB/保留期审计核对 |
+| `offboard invalid state 409` FAIL | 非 ACTIVE/SUSPENDED 状态应拒绝离户（409），检查状态机校验 |
+| `v10 api availability` SKIP（workflow/users 均 404/500） | tenant-service v9 未部署平台用户/SSO/工作流：确认 `GET /api/workflows/tenant-lifecycle`、`GET /api/platform/users` 可用 |
+| `platform user create` FAIL（无 temporaryPassword） | 创建未传密码时应返回一次性 `temporaryPassword`；检查 `PlatformUserView.temporaryPassword` |
+| `platform user disabled login 401` FAIL（仍可登录） | 禁用状态未参与认证：`/internal/platform-users/authenticate` 应拒绝 DISABLED |
+| `platform user login after reset` FAIL | 重置密码应返回新临时密码且立即生效；确认 reset-password 写回 password_hash |
+| `sso provider list no secret` FAIL | 管理端列表泄漏 `clientSecret`：只应暴露 `hasClientSecret` |
+| `sso provider test unreachable` FAIL（200 valid=true） | 不可达 issuer 的 discovery 应失败（400/40001 或 valid=false） |
+| `sso provider public list enabled/disabled` FAIL | 公开列表只含 enabled 且不含 secret；网关对 provider 有 60s 缓存，脚本已轮询 75s，仍失败说明缓存/过滤实现异常 |
+| `login tenant selection required` FAIL | 双租户同 username+password 未返回 `tenantSelectionRequired`：检查 `authenticate(tenantCode=null)` 多匹配逻辑 |
+| `auth tenants list contains other` SKIP | 候选按 `password_hash`（含随机盐）匹配，独立创建的账号盐不同；若要求按明文密码匹配需后端调整 |
+| `switch tenant` FAIL | `/api/auth/switch-tenant` 未换发 JWT：检查当前账号凭据校验与目标租户同 username 账号 |
+| `workflow structure` FAIL | `states<8` 或 `transitions=0`：检查 `TenantLifecycleWorkflowCatalog` 是否由状态机/技能聚合 |

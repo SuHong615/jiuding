@@ -21,15 +21,20 @@ import com.suhong.jiuding.common.api.ApiResponse;
 import com.suhong.jiuding.tenant.api.AuthenticateRequest;
 import com.suhong.jiuding.tenant.api.AuthenticateResponse;
 import com.suhong.jiuding.tenant.api.SwitchTenantRequest;
+import com.suhong.jiuding.tenant.api.TenantChoiceView;
 import com.suhong.jiuding.tenant.mfa.MfaAuthenticateRequest;
 import com.suhong.jiuding.tenant.service.AccountAuthService;
 import com.suhong.jiuding.tenant.support.Texts;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Internal authentication endpoints used by the gateway login chain (docs/13 section 2.2,
@@ -68,6 +73,20 @@ public class InternalAuthController {
                                                              HttpServletRequest httpRequest) {
         return ApiResponses.ok(accountAuthService.authenticateMfa(request,
                 clientIp(httpRequest), userAgent(httpRequest)));
+    }
+
+    /**
+     * Switchable tenants of the signed-in account (docs/20 section 3): same username + same
+     * password hash in ACTIVE tenants, excluding the current tenant. Platform accounts and
+     * unknown sessions return an empty array.
+     */
+    @GetMapping("/tenants")
+    public ApiResponse<List<TenantChoiceView>> tenants(
+            @RequestParam(required = false) String accountId,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String currentTenantId) {
+        return ApiResponses.ok(accountAuthService.switchableTenants(accountId, username,
+                currentTenantId));
     }
 
     /**

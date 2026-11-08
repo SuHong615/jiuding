@@ -231,6 +231,7 @@ public class AccountService {
                 AccountStatus.ACTIVE.name(),
                 credential.passwordHash(),
                 credential.passwordSalt(),
+                passwordHasher.fingerprint(initialPassword),
                 mustChange,
                 0,
                 null,
@@ -338,6 +339,7 @@ public class AccountService {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("password_hash", credential.passwordHash());
         fields.put("password_salt", credential.passwordSalt());
+        fields.put("password_fingerprint", passwordHasher.fingerprint(password));
         fields.put("must_change_password", mustChange);
         fields.put("failed_attempts", 0);
         fields.put("updated_at", TimeUtil.now());
@@ -412,6 +414,7 @@ public class AccountService {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("password_hash", credential.passwordHash());
         fields.put("password_salt", credential.passwordSalt());
+        fields.put("password_fingerprint", passwordHasher.fingerprint(request.newPassword()));
         fields.put("must_change_password", false);
         fields.put("failed_attempts", 0);
         fields.put("updated_at", TimeUtil.now());

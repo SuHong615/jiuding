@@ -460,6 +460,42 @@ function Test-ExportAvailable {
     }
 }
 
+function Test-V10Available {
+    param([string]$Url, [string]$Token)
+    if ([string]::IsNullOrWhiteSpace($Token)) {
+        return [pscustomobject]@{ Available = $false; Detail = 'admin login failed; cannot probe v10 API' }
+    }
+    $headers = @{ Authorization = ("Bearer {0}" -f $Token) }
+    $workflowStatus = 0
+    $workflowOk = $false
+    try {
+        $workflowResponse = Invoke-WebRequest -Uri "$Url/api/workflows/tenant-lifecycle" -Headers $headers -UseBasicParsing -TimeoutSec 10
+        $workflowStatus = [int]$workflowResponse.StatusCode
+        $payload = $workflowResponse.Content | ConvertFrom-Json
+        $workflowOk = ($null -ne $payload.data) -and ($payload.data.PSObject.Properties.Name -contains 'states')
+    }
+    catch {
+        $response = $_.Exception.Response
+        if ($response) { $workflowStatus = [int]$response.StatusCode }
+    }
+    $usersStatus = 0
+    $usersOk = $false
+    try {
+        $usersResponse = Invoke-WebRequest -Uri "$Url/api/platform/users" -Headers $headers -UseBasicParsing -TimeoutSec 10
+        $usersStatus = [int]$usersResponse.StatusCode
+        $usersPayload = $usersResponse.Content | ConvertFrom-Json
+        $usersOk = ($null -ne $usersPayload) -and -not (($usersPayload.PSObject.Properties.Name -contains 'code') -and [int]$usersPayload.code -ne 0)
+    }
+    catch {
+        $response = $_.Exception.Response
+        if ($response) { $usersStatus = [int]$response.StatusCode }
+    }
+    if ($workflowOk -or $usersOk) {
+        return [pscustomobject]@{ Available = $true; Detail = ('workflow HTTP ' + $workflowStatus + '; platform users HTTP ' + $usersStatus) }
+    }
+    return [pscustomobject]@{ Available = $false; Detail = ('v10 API not deployed; workflow HTTP ' + $workflowStatus + '; platform users HTTP ' + $usersStatus) }
+}
+
 # ---------------------------------------------------------------- static checks
 Write-Host '==> static checks' -ForegroundColor Cyan
 $composeFile = Join-Path $root 'deploy\docker-compose.yml'
@@ -499,7 +535,7 @@ if ($missingScripts.Count -eq 0) { Add-Result 'scripts' 'PASS' "$($requiredScrip
 else { Add-Result 'scripts' 'FAIL' ("missing: " + ($missingScripts -join ', ')) }
 
 $testsDir = Join-Path $root 'tests'
-$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-v7.ps1', 'e2e-v8.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
+$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-v7.ps1', 'e2e-v8.ps1', 'e2e-v10.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
 $missingTests = @()
 foreach ($test in $requiredTests) {
     if (-not (Test-Path (Join-Path $testsDir $test))) { $missingTests += $test }
@@ -542,6 +578,7 @@ else {
         Add-Result 'E2E v6b SCIM' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v7 quota' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v8 export' 'SKIP' 'gateway not ready'
+        Add-Result 'E2E v10 chain' 'SKIP' 'gateway not ready'
     }
     else {
         Add-Result 'gateway health' 'PASS' $BaseUrl
@@ -747,6 +784,25 @@ else {
         }
         else {
             Add-Result 'E2E v8 export' 'SKIP' '-SkipE2E'
+        }
+
+        # ------------------------------------------------ v10 platform identity / workflow checks
+        if (-not $SkipE2E) {
+            $v10 = Test-V10Available -Url $BaseUrl -Token $adminProbeToken
+            $e2eV10Script = Join-Path $testsDir 'e2e-v10.ps1'
+            if ($v10.Available -and (Test-Path $e2eV10Script)) {
+                Write-Host ''
+                Write-Host '==> tests/e2e-v10.ps1' -ForegroundColor Cyan
+                & $e2eV10Script -BaseUrl $BaseUrl -TimeoutSeconds $TimeoutSeconds
+                if ($LASTEXITCODE -eq 0) { Add-Result 'E2E v10 chain' 'PASS' 'platform users + SSO providers + tenant selection/switch + workflow' }
+                else { Add-Result 'E2E v10 chain' 'FAIL' "exit $LASTEXITCODE" }
+            }
+            else {
+                Add-Result 'E2E v10 chain' 'SKIP' $v10.Detail
+            }
+        }
+        else {
+            Add-Result 'E2E v10 chain' 'SKIP' '-SkipE2E'
         }
     }
 }
