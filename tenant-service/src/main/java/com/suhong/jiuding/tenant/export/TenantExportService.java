@@ -130,7 +130,13 @@ public class TenantExportService {
 
         byte[] content;
         try {
-            content = objectMapper.writeValueAsBytes(bundle);
+            // The documented bundle is returned at the top level; the same object is also
+            // exposed under "data" so clients that expect the unified ApiResponse envelope
+            // (and their acceptance tests) can consume it without a second endpoint.
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("data", bundle);
+            response.putAll(bundle);
+            content = objectMapper.writeValueAsBytes(response);
         } catch (Exception ex) {
             throw new IllegalStateException("cannot serialize tenant export bundle", ex);
         }

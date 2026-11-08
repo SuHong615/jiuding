@@ -425,6 +425,31 @@ API（租户审计/平台审计）则该条为 SKIP。
 | 无限额 | unlimited org not limited / account not limited | 无配额租户创 3 个组织/3 个账号均成功 |
 | 清理 | tenant cleanup | 软删两个测试租户 |
 
+### e2e-v8.ps1 断言清单（28 条，docs/18）
+
+| 分组 | 断言 | 说明 |
+|---|---|---|
+| 前置 | preflight gateway / login admin / tenant create | 建导出测试租户 A（DRAFT） |
+| 能力门 | export api availability | `GET /api/tenants/{A}/export?mask=true` 200 且含 tenant/accounts/audits |
+| 数据准备 | tenant activation / org create / account create / rating assess | 激活 A；2 个组织；MEMBER/ORG_ADMIN/TENANT_ADMIN 账号；评级评估 |
+| 导出 | export masked structure | 200 `application/json` + `Content-Disposition: attachment; filename="tenant-<code>-export-..."`；`exportedAt/tenant/orgUnits/accounts/rating.current+history/audits` 齐全 |
+| 掩码 | export masked pii | 所有账号 email/phone 含 `*`，且导出正文不出现账号明文 email |
+| 掩码 | export default mask | 不带 mask 参数默认掩码 |
+| 权限 | export tenant admin masked allowed | TENANT_ADMIN 掩码导出 200 |
+| 权限 | export unmasked admin | admin `mask=false` 返回明文 email/phone |
+| 权限 | export unmasked tenant admin / auditor | 非平台管理员 `mask=false` → 403（或保持掩码，按实测记录） |
+| 权限 | export forbidden member 403 / forbidden org admin 403 | MEMBER 与 ORG_ADMIN 导出 → 403 |
+| 审计 | export audit TENANT_EXPORTED | 后续导出的 audits 中含 `TENANT_EXPORTED` |
+| 离户准备 | offboard tenant setup | 建租户 B 并激活（ACTIVE 才允许离户） |
+| 离户状态 | offboard invalid state 409 | 对 DRAFT 租户 C 离户 → 409 |
+| 离户校验 | offboard reason required | 空 reason → 400，且租户状态不变 |
+| 离户权限 | offboard forbidden | 租户 JWT 调离户 → 403（仅 PLATFORM_ADMIN） |
+| 离户 | offboard success | `status=TERMINATED`、`deletedAt` 非空 |
+| 离户后 | tenant detail after offboard 404 / export after offboard 404 | 软删后详情与导出均 404 |
+| 幂等 | offboard repeated | 重复离户 → 404/409 均允许 |
+| 审计 | offboard audit TENANT_OFFBOARDED | 通过租户审计/平台审计探测；无读取 API 时 SKIP |
+| 清理 | tenant cleanup | 软删 A、C（B 已离户） |
+
 ## 预期输出示例
 
 旧环境（无 v2 接口）：
@@ -583,6 +608,34 @@ result: PASS
 [SKIP] quota api availability - GET /api/tenants/{id}/quota -> HTTP 404 (v7 quota API not deployed)
 [SKIP] ... (其余 20 条)
 PASS=3  FAIL=0  SKIP=20
+result: PASS
+```
+
+v8 导出/离户环境：
+
+```
+[PASS] export masked structure - orgUnits=2 accounts=3 audits=5 filename=attachment; filename="tenant-e2e-v...
+[PASS] export masked pii - accounts=3 sample=e***@example.com
+[PASS] export unmasked admin - email=... phone=13800001234
+[PASS] export unmasked tenant admin - HTTP 403 (unmask restricted to PLATFORM_ADMIN)
+[PASS] export forbidden member 403 - HTTP 403
+[PASS] export audit TENANT_EXPORTED - audit list contains TENANT_EXPORTED
+[PASS] offboard success - status=TERMINATED deletedAt=2026-11-08T12:19:10.429Z
+[PASS] tenant detail after offboard 404 - HTTP 404
+[PASS] offboard repeated - HTTP 404 code=40400 (404/409 both allowed)
+PASS=28  FAIL=0  SKIP=0
+result: PASS
+```
+
+旧环境（无 export API）：
+
+```
+[PASS] preflight gateway
+[PASS] login admin
+[PASS] tenant create
+[SKIP] export api availability - GET /api/tenants/{id}/export -> HTTP 500 (v8 export API not deployed)
+[SKIP] ... (其余 24 条)
+PASS=3  FAIL=0  SKIP=25
 result: PASS
 ```
 
