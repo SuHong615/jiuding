@@ -22,6 +22,7 @@ import com.suhong.jiuding.tenant.api.OrgUnitCreateRequest;
 import com.suhong.jiuding.tenant.api.OrgUnitMoveRequest;
 import com.suhong.jiuding.tenant.api.OrgUnitUpdateRequest;
 import com.suhong.jiuding.tenant.api.OrgUnitView;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import com.suhong.jiuding.tenant.service.OrgUnitService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -48,6 +49,7 @@ public class OrgUnitController {
     }
 
     @GetMapping
+    @RequirePermission("org:read")
     public ApiResponse<List<OrgUnitView>> list(
             @PathVariable String tenantId,
             @RequestParam(defaultValue = "tree") String format,
@@ -57,17 +59,20 @@ public class OrgUnitController {
     }
 
     @PostMapping
+    @RequirePermission("org:write")
     public ApiResponse<OrgUnitView> create(@PathVariable String tenantId,
                                            @Valid @RequestBody OrgUnitCreateRequest request) {
         return ApiResponses.ok(orgUnitService.create(tenantId, request));
     }
 
     @GetMapping("/{id}")
+    @RequirePermission("org:read")
     public ApiResponse<OrgUnitView> get(@PathVariable String tenantId, @PathVariable String id) {
         return ApiResponses.ok(orgUnitService.get(tenantId, id));
     }
 
     @PutMapping("/{id}")
+    @RequirePermission("org:write")
     public ApiResponse<OrgUnitView> update(@PathVariable String tenantId,
                                            @PathVariable String id,
                                            @Valid @RequestBody OrgUnitUpdateRequest request) {
@@ -75,6 +80,7 @@ public class OrgUnitController {
     }
 
     @PostMapping("/{id}/move")
+    @RequirePermission("org:write")
     public ApiResponse<OrgUnitView> move(@PathVariable String tenantId,
                                          @PathVariable String id,
                                          @RequestBody OrgUnitMoveRequest request) {
@@ -82,6 +88,7 @@ public class OrgUnitController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission("org:write")
     public ApiResponse<Void> delete(@PathVariable String tenantId, @PathVariable String id) {
         orgUnitService.delete(tenantId, id);
         return ApiResponses.ok(null);

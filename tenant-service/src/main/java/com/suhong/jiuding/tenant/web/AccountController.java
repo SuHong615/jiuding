@@ -28,6 +28,7 @@ import com.suhong.jiuding.tenant.api.AccountView;
 import com.suhong.jiuding.tenant.api.ChangePasswordRequest;
 import com.suhong.jiuding.tenant.api.LoginEventView;
 import com.suhong.jiuding.tenant.api.ResetPasswordResult;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import com.suhong.jiuding.tenant.service.AccountService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -52,6 +53,7 @@ public class AccountController {
     }
 
     @GetMapping
+    @RequirePermission("account:read")
     public ApiResponse<PageResult<AccountView>> list(
             @PathVariable String tenantId,
             @RequestParam(required = false) String orgUnitId,
@@ -66,12 +68,14 @@ public class AccountController {
     }
 
     @PostMapping
+    @RequirePermission("account:write")
     public ApiResponse<AccountCreateResult> create(@PathVariable String tenantId,
                                                    @Valid @RequestBody AccountCreateRequest request) {
         return ApiResponses.ok(accountService.create(tenantId, request));
     }
 
     @GetMapping("/{id}")
+    @RequirePermission("account:read")
     public ApiResponse<AccountView> get(@PathVariable String tenantId,
                                         @PathVariable String id,
                                         @RequestParam(defaultValue = "false") boolean mask) {
@@ -79,6 +83,7 @@ public class AccountController {
     }
 
     @PutMapping("/{id}")
+    @RequirePermission("account:write")
     public ApiResponse<AccountView> update(@PathVariable String tenantId,
                                            @PathVariable String id,
                                            @Valid @RequestBody AccountUpdateRequest request) {
@@ -86,6 +91,7 @@ public class AccountController {
     }
 
     @PostMapping("/{id}/status")
+    @RequirePermission("account:security")
     public ApiResponse<AccountView> changeStatus(@PathVariable String tenantId,
                                                  @PathVariable String id,
                                                  @Valid @RequestBody AccountStatusRequest request) {
@@ -93,6 +99,7 @@ public class AccountController {
     }
 
     @PostMapping("/{id}/reset-password")
+    @RequirePermission("account:security")
     public ApiResponse<ResetPasswordResult> resetPassword(
             @PathVariable String tenantId,
             @PathVariable String id,
@@ -103,12 +110,14 @@ public class AccountController {
 
     /** Unlock a LOCKED account (docs/14 section 3.1). */
     @PostMapping("/{id}/unlock")
+    @RequirePermission("account:security")
     public ApiResponse<AccountView> unlock(@PathVariable String tenantId, @PathVariable String id) {
         return ApiResponses.ok(accountService.unlock(tenantId, id));
     }
 
     /** Self-service password change (docs/14 section 3.1). */
     @PostMapping("/{id}/change-password")
+    @RequirePermission("account:write")
     public ApiResponse<AccountView> changePassword(@PathVariable String tenantId,
                                                    @PathVariable String id,
                                                    @Valid @RequestBody ChangePasswordRequest request) {
@@ -117,6 +126,7 @@ public class AccountController {
 
     /** Login security trail for one account (docs/14 section 3.1). */
     @GetMapping("/{id}/login-events")
+    @RequirePermission("account:read")
     public ApiResponse<PageResult<LoginEventView>> loginEvents(
             @PathVariable String tenantId,
             @PathVariable String id,
@@ -126,6 +136,7 @@ public class AccountController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission("account:security")
     public ApiResponse<Void> delete(@PathVariable String tenantId, @PathVariable String id) {
         accountService.delete(tenantId, id);
         return ApiResponses.ok(null);

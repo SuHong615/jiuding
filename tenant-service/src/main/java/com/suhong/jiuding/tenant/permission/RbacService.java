@@ -57,10 +57,13 @@ public class RbacService {
 
     private final RbacRepository repository;
     private final AuditService auditService;
+    private final PermissionCache permissionCache;
 
-    public RbacService(RbacRepository repository, AuditService auditService) {
+    public RbacService(RbacRepository repository, AuditService auditService,
+                       PermissionCache permissionCache) {
         this.repository = repository;
         this.auditService = auditService;
+        this.permissionCache = permissionCache;
     }
 
     // ------------------------------------------------------------------ caller permissions
@@ -112,6 +115,7 @@ public class RbacService {
         RoleRow row = new RoleRow(code, name, scope, false, "ACTIVE",
                 Texts.truncate(Texts.blankToNull(request.description()), 256));
         repository.insertRole(row);
+        permissionCache.evictAll();
         audit("ROLE_CREATED", "role " + code + " created (scope=" + scope + ")");
         return RoleView.of(row, List.of());
     }
@@ -131,6 +135,7 @@ public class RbacService {
             throw BizException.invalid("unknown permission codes: " + String.join(", ", unknown));
         }
         repository.replaceRolePermissions(role.code(), permissionCodes);
+        permissionCache.evictAll();
         audit("ROLE_UPDATED", "role " + role.code() + " permissions updated ("
                 + permissionCodes.size() + " codes)");
         return RoleView.of(role, permissionCodes);
@@ -144,6 +149,7 @@ public class RbacService {
             throw BizException.conflict("built-in role cannot be deleted: " + role.code());
         }
         repository.deleteRole(role.code());
+        permissionCache.evictAll();
         audit("ROLE_DELETED", "role " + role.code() + " deleted");
     }
 

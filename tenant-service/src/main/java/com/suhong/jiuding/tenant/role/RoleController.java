@@ -19,6 +19,7 @@ package com.suhong.jiuding.tenant.role;
 
 import com.suhong.jiuding.common.api.ApiResponse;
 import com.suhong.jiuding.tenant.permission.RbacService;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import com.suhong.jiuding.tenant.permission.RoleView;
 import jakarta.validation.Valid;
 import org.slf4j.MDC;
@@ -46,22 +47,26 @@ public class RoleController {
     }
 
     @GetMapping
+    @RequirePermission("rbac:read")
     public ApiResponse<List<RoleView>> list(@RequestParam(required = false) String scope) {
         return ok(rbacService.roles(scope));
     }
 
     @PostMapping
+    @RequirePermission("rbac:write")
     public ApiResponse<RoleView> create(@Valid @RequestBody RoleCreateRequest request) {
         return ok(rbacService.createRole(request));
     }
 
     @PutMapping("/{code}/permissions")
+    @RequirePermission("rbac:write")
     public ApiResponse<RoleView> updatePermissions(@PathVariable String code,
                                                    @Valid @RequestBody RolePermissionsRequest request) {
         return ok(rbacService.updatePermissions(code, request));
     }
 
     @DeleteMapping("/{code}")
+    @RequirePermission("rbac:write")
     public ApiResponse<Void> delete(@PathVariable String code) {
         rbacService.deleteRole(code);
         return ok(null);

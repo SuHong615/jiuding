@@ -36,12 +36,14 @@ public class PermissionController {
         this.rbacService = rbacService;
     }
 
+    /** Any authenticated caller may query its own effective permissions. */
     @GetMapping("/me/permissions")
     public ApiResponse<MePermissionsView> mePermissions() {
         return ok(rbacService.mePermissions());
     }
 
     @GetMapping("/platform/permissions")
+    @RequirePermission("rbac:read")
     public ApiResponse<List<PermissionView>> permissions() {
         return ok(rbacService.permissions());
     }

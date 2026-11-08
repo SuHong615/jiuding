@@ -26,6 +26,7 @@ import com.suhong.jiuding.tenant.api.OverviewView;
 import com.suhong.jiuding.tenant.api.ReasonRequest;
 import com.suhong.jiuding.tenant.api.TenantCreateRequest;
 import com.suhong.jiuding.tenant.api.TenantView;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import com.suhong.jiuding.tenant.service.TenantService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -54,11 +55,13 @@ public class TenantController {
     }
 
     @PostMapping
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> create(@Valid @RequestBody TenantCreateRequest request) {
         return ApiResponses.ok(tenantService.create(request));
     }
 
     @GetMapping
+    @RequirePermission({"tenant:read", "org:write"})
     public ApiResponse<PageResult<TenantView>> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String plan,
@@ -70,50 +73,59 @@ public class TenantController {
     }
 
     @GetMapping("/overview")
+    @RequirePermission({"tenant:read", "org:write"})
     public ApiResponse<OverviewView> overview() {
         return ApiResponses.ok(tenantService.overview());
     }
 
     @GetMapping("/{id}")
+    @RequirePermission({"tenant:read", "org:write"})
     public ApiResponse<TenantView> get(@PathVariable String id) {
         return ApiResponses.ok(tenantService.get(id));
     }
 
     @PutMapping("/{id}")
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> update(@PathVariable String id,
                                           @Valid @RequestBody TenantCreateRequest request) {
         return ApiResponses.ok(tenantService.update(id, request));
     }
 
     @PostMapping("/{id}/submit")
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> submit(@PathVariable String id) {
         return ApiResponses.ok(tenantService.submit(id));
     }
 
     @PostMapping("/{id}/suspend")
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> suspend(@PathVariable String id,
                                            @RequestBody(required = false) ReasonRequest body) {
         return ApiResponses.ok(tenantService.suspend(id, body == null ? null : body.reason()));
     }
 
     @PostMapping("/{id}/activate")
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> activate(@PathVariable String id) {
         return ApiResponses.ok(tenantService.activate(id));
     }
 
     @PostMapping("/{id}/terminate")
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> terminate(@PathVariable String id,
                                              @RequestBody(required = false) ReasonRequest body) {
         return ApiResponses.ok(tenantService.terminate(id, body == null ? null : body.reason()));
     }
 
     @GetMapping("/{id}/audits")
+    @RequirePermission("audit:read")
     public ApiResponse<List<AuditView>> audits(@PathVariable String id) {
         return ApiResponses.ok(tenantService.audits(id));
     }
 
     /** Compliance CSV export (docs/14 section 3.2). */
     @GetMapping("/{id}/audits/export")
+    @RequirePermission("audit:read")
     public ResponseEntity<byte[]> exportAudits(
             @PathVariable String id,
             @RequestParam(required = false) String from,
@@ -132,6 +144,7 @@ public class TenantController {
 
     /** Soft delete (docs/11 section 6.1): platform administrator, non ACTIVE tenant only. */
     @DeleteMapping("/{id}")
+    @RequirePermission("tenant:write")
     public ApiResponse<TenantView> delete(@PathVariable String id) {
         return ApiResponses.ok(tenantService.delete(id));
     }

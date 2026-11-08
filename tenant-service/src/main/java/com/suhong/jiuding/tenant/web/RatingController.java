@@ -22,6 +22,7 @@ import com.suhong.jiuding.common.api.PageResult;
 import com.suhong.jiuding.tenant.api.RatingAssessRequest;
 import com.suhong.jiuding.tenant.api.RatingOverrideRequest;
 import com.suhong.jiuding.tenant.api.RatingView;
+import com.suhong.jiuding.tenant.permission.RequirePermission;
 import com.suhong.jiuding.tenant.service.RatingService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,6 +45,7 @@ public class RatingController {
     }
 
     @GetMapping
+    @RequirePermission("rating:read")
     public ApiResponse<PageResult<RatingView>> history(
             @PathVariable String tenantId,
             @RequestParam(defaultValue = "0") int page,
@@ -52,17 +54,20 @@ public class RatingController {
     }
 
     @GetMapping("/current")
+    @RequirePermission("rating:read")
     public ApiResponse<RatingView> current(@PathVariable String tenantId) {
         return ApiResponses.ok(ratingService.current(tenantId));
     }
 
     @PostMapping("/assess")
+    @RequirePermission("rating:assess")
     public ApiResponse<RatingView> assess(@PathVariable String tenantId,
                                           @RequestBody(required = false) @Valid RatingAssessRequest request) {
         return ApiResponses.ok(ratingService.assess(tenantId, request));
     }
 
     @PostMapping("/override")
+    @RequirePermission("rating:override")
     public ApiResponse<RatingView> override(@PathVariable String tenantId,
                                             @Valid @RequestBody RatingOverrideRequest request) {
         return ApiResponses.ok(ratingService.override(tenantId, request));
