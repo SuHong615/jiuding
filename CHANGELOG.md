@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- v8 租户数据导出（默认脱敏/平台明文/审计）与离户（TERMINATED+软删+审计）；CLI `tenant export/offboard`；E2E v8
 - v7 配额与用量：席位/组织配额强制（409 `QUOTA_EXCEEDED`）、`GET /api/tenants/{id}/quota` 用量 API、网关按租户 API RPM 限流（429/42901）、控制台配额卡片
 - v7 运维：`deploy/k8s/backup.sh` / `restore.sh`（四库 pg_dump/pg_restore + manifest sha256）、k3s 随机 Secret 生成、E2E v7
 

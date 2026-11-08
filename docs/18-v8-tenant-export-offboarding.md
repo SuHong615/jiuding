@@ -1,6 +1,6 @@
 # 18 · v8：租户数据导出与离户（Offboarding）
 
-> 状态：实施中（2026-11-08）｜Owner：Lead｜关联：docs/03、docs/14、docs/17、docs/PRODUCT_GUIDE.md
+> 状态：**已完成并验收**（2026-11-08）｜Owner：Lead｜关联：docs/03、docs/14、docs/17、docs/PRODUCT_GUIDE.md
 
 ## 1. 目标
 

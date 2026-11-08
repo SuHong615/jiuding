@@ -8,13 +8,13 @@
 | 维度 | 结果 |
 |---|---|
 | 后端编译（9 模块） | ✅ BUILD SUCCESS |
-| 自动化测试 | ✅ **496 个测试全部通过**（0 失败 / 0 错误 / 0 跳过） |
+| 自动化测试 | ✅ **521 个测试全部通过**（0 失败 / 0 错误 / 0 跳过） |
 | v1 端到端 E2E | ✅ **16/16 PASS**（`integration/verify.ps1`，k8s） |
 | v2 身份域 E2E | ✅ **31/31 PASS**（`tests/e2e-v2.ps1`：组织/账号/评级/软删） |
 | v3 租户登录/RBAC E2E | ✅ **42/42 PASS**（`tests/e2e-v3.ps1`：租户账号登录、ORG_ADMIN 子树、MEMBER 只读、auditor 跨租户、锁定） |
 | MCP 协议冒烟 | ✅ v1 **8/8** + v2 **7/7**（**22 工具**） |
-| 交付验证脚本 | ✅ **18/18 PASS**（`scripts/verify.ps1`：静态 + v1/v2/v3/v5/技能版本/v6/v6B/v7 E2E + MCP） |
-| **v5 技能/MCP/入驻/RBAC E2E** | ✅ **46/46 PASS**（技能中心、按人 MCP Key+审计、自助入驻、组织/账号导入、角色权限、生命周期） |\n| **v5.1 技能版本/调试 E2E** | ✅ **13/13 PASS**（卡片管理后端：版本列表/旧版本详情/调试命中与未命中/404） |\n| **v6 OIDC/MFA E2E** | ✅ **25/25 PASS**（OIDC 禁用态；MFA setup→登录挑战→/login/mfa→恢复码一次性→禁用→审计） |\n| **v6B SCIM E2E** | ✅ **31/31 PASS**（SCIM Token、Users/Groups CRUD/filter/分页/错误 schema/撤销 401） |\n| **v7 配额/用量 E2E** | ✅ **23/23 PASS**（quota API、席位/组织强制 409、导入超限、PUT 更新、RPM 429、无限额） |
+| 交付验证脚本 | ✅ **19/19 PASS**（`scripts/verify.ps1`：静态 + v1~v8 E2E + MCP） |
+| **v5 技能/MCP/入驻/RBAC E2E** | ✅ **46/46 PASS**（技能中心、按人 MCP Key+审计、自助入驻、组织/账号导入、角色权限、生命周期） |\n| **v5.1 技能版本/调试 E2E** | ✅ **13/13 PASS**（卡片管理后端：版本列表/旧版本详情/调试命中与未命中/404） |\n| **v6 OIDC/MFA E2E** | ✅ **25/25 PASS**（OIDC 禁用态；MFA setup→登录挑战→/login/mfa→恢复码一次性→禁用→审计） |\n| **v6B SCIM E2E** | ✅ **31/31 PASS**（SCIM Token、Users/Groups CRUD/filter/分页/错误 schema/撤销 401） |\n| **v7 配额/用量 E2E** | ✅ **23/23 PASS**（quota API、席位/组织强制 409、导入超限、PUT 更新、RPM 429、无限额） |\n| **v8 导出/离户 E2E** | ✅ **27 PASS / 1 SKIP**（脱敏/明文权限、attachment、离户 TERMINATED+404、审计导出） |
 | **v4 账号安全/合规 E2E** | ✅ **20/20 PASS**（`tests/e2e-v4.ps1`：锁定/解锁/改密/登录审计/CSV/掩码/评级 delta/限流） |
 | **k8s 生产化** | ✅ 2 副本 + PDB/HPA + CronJob；滚动重启 **0 失败**；CronJob `refreshed=14` |
 | 前端生产构建 | ✅ 0 TypeScript 错误；dist 349.7 KB（JS gzip 95.6 KB / CSS gzip 7.8 KB） |
@@ -25,13 +25,13 @@
 
 **结论：v1（多租户+审批自动化+采集+MCP）、v2（组织/账号/评级/开发者工具极简 UI）、v3（租户账号登录+五档 RBAC+评级周期化）、v4（账号安全/合规导出/评级增量/生产化）全部在 k3s 与 Docker Compose 双环境端到端验证通过。**
 
-## 2. 测试明细（全量 496）
+## 2. 测试明细（全量 521）
 
 | 模块 | 测试数 | 覆盖重点 |
 |---|---|---|
 | `agent-kernel` | 2 | AgentScope 2.0.4 ReActAgent 工具调用通路 |
 | `tenancy-common` | 18 | JWT（含 oid）/AuthFilter/内部令牌/租户头/失败关闭 |
-| `tenant-service` | **177** | v3 86 + v4 16：登录事件审计（IP/UA/原因）、解锁、本人改密、审计 CSV 导出、PII 掩码、评级 delta/等级变化审计、内部 refresh、组织树/评级事务/软删 |
+| `tenant-service` | **196** | v3 86 + v4 16：登录事件审计（IP/UA/原因）、解锁、本人改密、审计 CSV 导出、PII 掩码、评级 delta/等级变化审计、内部 refresh、组织树/评级事务/软删 |
 | `approval-service` | 35 | 工作流/自动决策/SLA/权限/下游重试 |
 | `agent-service` | **80** | 规则引擎、5 个技能包（RATING 类型）、Agent 运行 |
 | `mcp-service` | **45** | 22 工具 schema/调用映射、数组→对象 structuredContent、错误映射、SSE、鉴权 |
@@ -172,6 +172,16 @@
 
 > 部署注意：开源化时为 SQL 迁移加入许可证头，会改变 Flyway 校验和。**已有旧库升级需执行 `flyway repair`**；本次本地演示库通过重建 4 个数据库完成重置。
 
+## 4.16 v8 租户导出/离户实测（2026-11-08）
+
+| 场景 | 实测结果 |
+|---|---|
+| 导出（默认脱敏） | `GET /api/tenants/{id}/export` → 200 JSON bundle（tenant/orgUnits/accounts/rating/audits）、attachment 文件名、email/phone 掩码 |
+| 明文导出 | `mask=false` 仅 PLATFORM_ADMIN → 明文 email/phone；TENANT_ADMIN/AUDITOR → 403 |
+| 权限 | ORG_ADMIN/MEMBER 导出 → 403；TENANT_ADMIN 可脱敏导出；审计 `TENANT_EXPORTED` |
+| 离户 | `POST /offboard {reason}` → TERMINATED + deletedAt；离户后 detail/export → 404；重复离户 404；DRAFT 409；租户管理员 403 |
+| E2E | `tests/e2e-v8.ps1` **27 PASS / 1 SKIP**（离户审计在软删后无读接口，服务端已写入） |
+| 统一验证 | `scripts/verify.ps1` **19/19 PASS** |
 ## 5. 架构审查与最佳实践落实（docs/11、docs/13）
 
 | 主题 | 决策 |
@@ -204,7 +214,7 @@
 ## 7. 复现命令
 
 ```powershell
-mvn -B -f D:\deepseekHarness\tenancy-center\pom.xml test          # 496 tests
+mvn -B -f D:\deepseekHarness\tenancy-center\pom.xml test          # 521 tests
 cd D:\deepseekHarness\tenancy-center\frontend; npm run build
 # k8s 更新与验收
 wsl -d opencode-docker -e /bin/sh /mnt/d/deepseekHarness/tenancy-center/deploy/k8s/update-images.sh
@@ -218,13 +228,13 @@ sh deploy/k8s/prod/apply-prod.sh
 sh deploy/k8s/zero-downtime-check.sh 90
 ```
 
-## 8. 交付规模（v7）
+## 8. 交付规模（v8）
 
 - 后端 Java：340+ 文件；前端 65+ TS/TSX 文件
 - 技能：5 内置 + 上传/审核/版本/调试/启停；MCP 工具 22；RBAC 43 权限/5 内置角色
 - 安全：OIDC/SSO、MFA、SCIM 2.0、账号安全、登录限流、K8s 随机 Secret、secret-scan CI
 - 配额：席位/组织强制、用量 API、网关 API RPM 限流；备份/恢复脚本
 - 文档：18 份（新增 docs/17 配额/备份）
-- 测试：496 自动化测试 + 31 v2 + 42 v3 + 20 v4 + 46 v5 + 13 技能 + 25 v6 + 31 v6B + 23 v7 + 15 MCP 断言
+- 测试：521 自动化测试 + 31 v2 + 42 v3 + 20 v4 + 46 v5 + 13 技能 + 25 v6 + 31 v6B + 23 v7 + 27 v8 + 15 MCP 断言
 - 生产化：2 副本 + PDB ×6 + HPA ×2 + CronJob ×2；零中断验证通过
 - UI 截图：`docs/assets/ui-login-v3.png`、`ui-tenants.png`、`ui-org.png`

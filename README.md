@@ -113,7 +113,7 @@ jiuding/
 | [Skill 规范](docs/04-skill-spec.md) / [MCP 规范](docs/05-mcp-spec.md) | 规则 DSL 与 MCP 工具 |
 | [运维部署](docs/06-devops.md) | Docker/k3s/生产化 |
 | [验收报告](docs/10-acceptance-report.md) | 473 测试 / E2E / 实测数据 |
-| [v3 RBAC](docs/13-v3-account-login-rbac.md) · [v4 安全合规](docs/14-v4-security-compliance-production.md) · [v5 技能/MCP/RBAC](docs/15-v5-skill-mcp-onboarding-rbac.md) · [v6 SSO/MFA/SCIM](docs/16-v6-sso-mfa-scim.md) · [v7 配额/备份](docs/17-v7-quota-usage-backup.md) | 版本演进 |
+| [v3 RBAC](docs/13-v3-account-login-rbac.md) · [v4 安全合规](docs/14-v4-security-compliance-production.md) · [v5 技能/MCP/RBAC](docs/15-v5-skill-mcp-onboarding-rbac.md) · [v6 SSO/MFA/SCIM](docs/16-v6-sso-mfa-scim.md) · [v7 配额/备份](docs/17-v7-quota-usage-backup.md) · [v8 导出/离户](docs/18-v8-tenant-export-offboarding.md) | 版本演进 |
 
 ## 验证
 
