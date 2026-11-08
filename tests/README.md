@@ -18,6 +18,7 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 | `e2e-v6.ps1` | **v6 阶段 A E2E**（docs/16 §2/§3）：OIDC `status`（未配置 enabled=false）/`authorize` 404/`callback` 400；MFA 租户账号 setup→verify（TOTP）→登录返回 `mfaRequired`→`/api/auth/login/mfa` 成功→错误码 401→恢复码一次性→禁用→审计（MFA_ENROLLED/VERIFIED/DISABLED） |
 | `e2e-v6b.ps1` | **v6 阶段 B SCIM E2E**（docs/16 §7.1）：SCIM token 创建（明文一次）/撤销、无 token 与坏 token 401、ServiceProviderConfig 200；Users POST/GET/filter/GET id/PATCH active=false/PUT displayName/分页/DELETE；Groups POST/GET/filter/PATCH 改名+成员/DELETE（204 或 409 均接受）；SCIM Error schema（401/404/409）；清理撤销 token + 软删租户 |
 | `e2e-v7.ps1` | **v7 配额/用量/RPM E2E**（docs/17）：建租户（quotaSeats=2/quotaOrgUnits=2/quotaApiRpm=3）→ `GET /api/tenants/{id}/quota` 字段/状态 → 组织与账号按上限创建、超限 409 → CSV 导入（重复行 skipped + 超限行 failed，不中断）→ PUT 提升配额并校验 → 租户 JWT 网关 RPM 第 4 次 429/42901（未实现 SKIP）→ 无配额租户不受限 → 软删租户 |
+| `e2e-v8.ps1` | **v8 导出/离户 E2E**（docs/18）：数据准备（组织/账号/评级/审计）→ `export?mask=true` 结构与 PII 掩码 + `Content-Disposition` → 默认 mask、TENANT_ADMIN 只读掩码、admin `mask=false` 明文、非平台 403 → MEMBER/ORG_ADMIN 403 → `TENANT_EXPORTED` 审计 → 离户（reason 必填、仅平台管理员、ACTIVE/SUSPENDED、TERMINATED+deletedAt）→ 离户后 detail/export 404、重复离户 404/409、`TENANT_OFFBOARDED` 审计探测 → 清理 |
 | `mcp-smoke.ps1` | v1 MCP 协议冒烟：`initialize` / `notifications/initialized` / `ping` / `tools/list`（14 工具）/ `tools/call` / 未知方法 `-32601` / `GET /mcp/info` |
 | `mcp-smoke-v2.ps1` | **v2 MCP 冒烟**：`tools/list` 数量（14 基础工具 + 8 个 v2 工具 = 22）+ `org.tree` / `account.list` / `rating.list` 调用断言 |
 | `README.md` | 本文件 |
@@ -50,6 +51,9 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 12. `e2e-v7.ps1` 依赖 `docs/17` 的配额/用量 API（`GET /api/tenants/{id}/quota`）与网关 RPM 限流：
     建租户时传 `quotaOrgUnits`（迁移 V8 新字段）；**quota 路由缺失时整体 SKIP**；
     网关 RPM 默认不启用，6 次租户 JWT 调用内没有 429 时该断言为 SKIP（不算失败）。
+13. `e2e-v8.ps1` 依赖 `docs/18` 的导出（`GET /api/tenants/{id}/export?mask=`）与离户（`POST .../offboard`）：
+    **export 路由缺失时整体 SKIP**；离户后数据会被软删，`TENANT_OFFBOARDED` 审计若没有可读的
+    审计 API（租户审计/平台审计）则该条断言为 SKIP（不算失败）。
 
 ## 执行
 
@@ -82,6 +86,9 @@ pwsh ./tests/e2e-v6b.ps1 -BaseUrl http://localhost:18080
 # v7 配额/用量/RPM E2E（配额字段→组织/账号超限→导入超限→PUT 提升→RPM 429→无限额租户）
 pwsh ./tests/e2e-v7.ps1 -BaseUrl http://localhost:18080
 
+# v8 租户导出/离户 E2E（掩码/明文/权限/审计→离户→404/重复离户）
+pwsh ./tests/e2e-v8.ps1 -BaseUrl http://localhost:18080
+
 # 指定 k8s 端口
 powershell -File ./tests/e2e-v2.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v3.ps1 -BaseUrl http://localhost:30080
@@ -91,6 +98,7 @@ powershell -File ./tests/e2e-skill.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v6.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v6b.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v7.ps1 -BaseUrl http://localhost:30080
+powershell -File ./tests/e2e-v8.ps1 -BaseUrl http://localhost:30080
 
 # MCP 协议冒烟
 pwsh ./tests/mcp-smoke.ps1 -BaseUrl http://localhost:18080 -ApiKey dev-mcp-key
@@ -102,8 +110,8 @@ pwsh ./scripts/verify.ps1
 pwsh ./scripts/verify.ps1 -TenantServiceUrl http://localhost:8081
 ```
 
-建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `scripts/verify.ps1`。
-`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
+建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `e2e-v8.ps1` → `scripts/verify.ps1`。
+`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7/v8 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
 
 ## 版本能力门（v2 rollout 期间的关键行为）
 
@@ -199,6 +207,18 @@ OIDC 未部署 → `[SKIP] v6 api availability - v6 API not deployed; GET /api/a
 
 `scripts/verify.ps1` 的 `Test-QuotaAvailable` 复用同一探测：取列表里第一个租户调用 quota；没有租户时
 `SKIP 'no tenant available to probe...'`，不创建数据。网关 RPM 未启用时 `rpm 429` 断言为 SKIP。
+
+### v8 导出/离户能力门
+
+`e2e-v8.ps1` 建租户后、准备数据前调用 `GET /api/tenants/{id}/export?mask=true` 作为能力标记：
+
+- 200 且响应含 `tenant/accounts/audits` → 继续全部导出/离户断言；
+- 404/405/500/501 → `[SKIP] export api availability - ... (v8 export API not deployed)`，其余 24 条断言
+  全部 `SKIP`，退出码 0（脚本会清理刚建的租户）。
+
+`scripts/verify.ps1` 的 `Test-ExportAvailable` 复用同一探测：取列表里第一个租户调用 export；没有租户时
+`SKIP 'no tenant available to probe...'`，不创建数据。离户后的 `TENANT_OFFBOARDED` 审计若没有可读审计
+API（租户审计/平台审计）则该条为 SKIP。
 
 ## 断言与退出码
 

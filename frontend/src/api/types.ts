@@ -194,6 +194,24 @@ export interface TenantAudit {
   detail?: string | null
 }
 
+/* ------------------------------ v8：租户导出 / 离户（docs/18 §2/§3） ------------------------------ */
+
+export interface TenantExportPayload {
+  exportedAt?: string
+  tenant?: TenantView
+  orgUnits?: OrgUnitView[]
+  accounts?: AccountView[]
+  rating?: {
+    current?: RatingCurrentView | null
+    history?: RatingView[]
+  }
+  audits?: TenantAudit[]
+}
+
+export interface TenantOffboardRequest {
+  reason: string
+}
+
 export interface TenantOverview {
   total?: number
   byStatus?: Record<string, number>

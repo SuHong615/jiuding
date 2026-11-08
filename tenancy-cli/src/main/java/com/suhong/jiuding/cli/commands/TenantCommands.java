@@ -20,11 +20,14 @@ package com.suhong.jiuding.cli.commands;
 import static com.suhong.jiuding.cli.BaseCommand.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.suhong.jiuding.cli.ApiClient;
+import com.suhong.jiuding.cli.ApiException;
 import com.suhong.jiuding.cli.BaseCommand;
 import com.suhong.jiuding.cli.CliUsageException;
 import com.suhong.jiuding.cli.ExitCodes;
 import com.suhong.jiuding.cli.Json;
 import com.suhong.jiuding.cli.TableRenderer;
+import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -48,7 +51,7 @@ public final class TenantCommands {
     }
 
     @Command(name = "tenant", mixinStandardHelpOptions = true,
-            description = "租户管理：查询 / 创建 / 提交 / 停用 / 启用 / 终止 / 删除 / 导入组织 / 导入账号 / 配额用量",
+            description = "租户管理：查询 / 创建 / 提交 / 停用 / 启用 / 终止 / 删除 / 导出 / 离户 / 导入组织 / 导入账号 / 配额用量",
             subcommands = {
                     TenantCommands.ListCommand.class,
                     TenantCommands.GetCommand.class,
@@ -58,6 +61,8 @@ public final class TenantCommands {
                     TenantCommands.ActivateCommand.class,
                     TenantCommands.TerminateCommand.class,
                     TenantCommands.DeleteCommand.class,
+                    TenantCommands.ExportCommand.class,
+                    TenantCommands.OffboardCommand.class,
                     TenantCommands.QuotaCommand.class,
                     TenantCommands.ImportOrgsCommand.class,
                     TenantCommands.ImportAccountsCommand.class
@@ -502,6 +507,111 @@ public final class TenantCommands {
                 return String.format(java.util.Locale.ROOT, "%.0f%%", value);
             }
             return String.format(java.util.Locale.ROOT, "%.1f%%", value);
+        }
+    }
+
+    // ---------------------------------------------------------------- export / offboard (docs/18 §5)
+
+    @Command(name = "export", mixinStandardHelpOptions = true,
+            description = "导出租户数据 JSON（默认脱敏；--out 保存）")
+    public static class ExportCommand extends BaseCommand {
+
+        @Parameters(index = "0", paramLabel = "<tenantId>", description = "租户 ID")
+        String tenantId;
+
+        @ArgGroup(exclusive = true, multiplicity = "0..1")
+        MaskGroup maskGroup;
+
+        static class MaskGroup {
+            @Option(names = "--mask", description = "脱敏导出（默认）")
+            boolean mask;
+
+            @Option(names = "--no-mask", description = "导出明文（仅平台管理员，后端越权返回 403）")
+            boolean noMask;
+        }
+
+        @Option(names = {"--out", "-o"}, paramLabel = "<file.json>", description = "保存到本地 JSON 文件")
+        Path out;
+
+        @Override
+        public Integer call() {
+            String tid = tenantId == null ? "" : tenantId.trim();
+            boolean masked = maskGroup == null || !maskGroup.noMask;
+            Map<String, String> query = new LinkedHashMap<>();
+            query.put("mask", String.valueOf(masked));
+
+            ApiClient.RawResponse response;
+            try {
+                response = apiForTenant(tid).getRaw("/api/tenants/" + encPath(tid) + "/export", query);
+            } catch (ApiException e) {
+                if (!masked && e.exitCode() == ExitCodes.AUTH) {
+                    throw new ApiException(ExitCodes.AUTH, e.apiCode(),
+                            "导出明文需要平台管理员权限（403）；当前账号无权限。"
+                                    + "可去掉 --no-mask 使用默认脱敏导出（--mask）", e);
+                }
+                throw e;
+            }
+
+            String json = response.body() == null ? "" : response.body();
+            if (out != null) {
+                try {
+                    Path parent = out.toAbsolutePath().getParent();
+                    if (parent != null) {
+                        Files.createDirectories(parent);
+                    }
+                    Files.writeString(out, json, StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    throw new CliUsageException("写入导出文件失败: " + out + " (" + e.getMessage() + ")");
+                }
+                if (jsonOutput()) {
+                    out().println(Json.pretty(Json.object()
+                            .put("out", out.toString())
+                            .put("mask", masked)
+                            .put("bytes", json.getBytes(StandardCharsets.UTF_8).length)
+                            .put("contentType", response.contentType())));
+                } else {
+                    out().println("已导出租户数据: " + out + "（mask=" + masked + ", "
+                            + json.length() + " 字符, " + response.contentType() + "）");
+                }
+                return ExitCodes.OK;
+            }
+
+            // No --out: print the JSON document (pretty when parseable, raw otherwise).
+            try {
+                out().println(Json.pretty(Json.parse(json)));
+            } catch (RuntimeException e) {
+                out().println(json);
+            }
+            return ExitCodes.OK;
+        }
+    }
+
+    @Command(name = "offboard", mixinStandardHelpOptions = true,
+            description = "租户离户：终止 + 软删（仅平台管理员，必须填写原因）")
+    public static class OffboardCommand extends BaseCommand {
+
+        @Parameters(index = "0", paramLabel = "<tenantId>", description = "租户 ID")
+        String tenantId;
+
+        @Option(names = "--reason", paramLabel = "<text>", required = true, description = "离户原因（≤512）")
+        String reason;
+
+        @Override
+        public Integer call() {
+            String tid = tenantId == null ? "" : tenantId.trim();
+            if (reason == null || reason.isBlank()) {
+                throw new CliUsageException("--reason 离户原因不能为空");
+            }
+            if (reason.length() > 512) {
+                throw new CliUsageException("--reason 长度不能超过 512 字符");
+            }
+            JsonNode data = apiForTenant(tid).post(
+                    "/api/tenants/" + encPath(tid) + "/offboard",
+                    Map.of("reason", reason));
+            return emitDetail(data,
+                    List.of("ID", "租户编码", "状态", "删除时间", "更新时间"),
+                    List.of(text(data, "id"), text(data, "tenantCode"), text(data, "status"),
+                            text(data, "deletedAt"), text(data, "updatedAt")));
         }
     }
 

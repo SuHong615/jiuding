@@ -37,6 +37,8 @@ export interface Permissions {
   canReadAccounts: boolean
   canViewLoginEvents: boolean
   canChangeOwnPassword: boolean
+  canExportTenant: boolean
+  canOffboardTenant: boolean
   canAssessRating: boolean
   canOverrideRating: boolean
   canReadRating: boolean
@@ -98,6 +100,9 @@ export function buildPermissions(principal: Principal | null): Permissions {
     canViewLoginEvents: isPlatformAdmin || isTenantAdmin || isOrgAdmin || isAuditor || isMember,
     // 仅租户登录账号可修改自己的密码（平台账号改密不在本期范围）
     canChangeOwnPassword: Boolean(principal?.tenantId),
+    // docs/18 §4：导出见平台管理员/租户管理员/审计员；离户仅平台管理员
+    canExportTenant: isPlatformAdmin || isTenantAdmin || isAuditor,
+    canOffboardTenant: isPlatformAdmin,
     canAssessRating: isPlatformAdmin || isTenantAdmin,
     canOverrideRating: isPlatformAdmin,
     canReadRating,
