@@ -25,12 +25,19 @@ import com.suhong.jiuding.approval.config.ApprovalProperties;
 import com.suhong.jiuding.approval.domain.ApprovalEntity;
 import com.suhong.jiuding.approval.domain.ApprovalNodeEntity;
 import com.suhong.jiuding.approval.domain.ApprovalState;
+import com.suhong.jiuding.approval.domain.AutoDecision;
 import com.suhong.jiuding.approval.domain.DecisionType;
 import com.suhong.jiuding.approval.domain.NodeState;
 import com.suhong.jiuding.approval.domain.NodeType;
 import com.suhong.jiuding.approval.domain.WorkflowNodes;
 import com.suhong.jiuding.approval.repo.ApprovalRepository;
 import com.suhong.jiuding.approval.support.Texts;
+import com.suhong.jiuding.approval.workflowdef.PlannedNode;
+import com.suhong.jiuding.approval.workflowdef.PublishedWorkflow;
+import com.suhong.jiuding.approval.workflowdef.WorkflowDefinitionModel;
+import com.suhong.jiuding.approval.workflowdef.WorkflowDefinitionService;
+import com.suhong.jiuding.approval.workflowdef.WorkflowEngine;
+import com.suhong.jiuding.approval.workflowdef.WorkflowPlan;
 import com.suhong.jiuding.common.api.PageResult;
 import com.suhong.jiuding.common.error.BizException;
 import com.suhong.jiuding.common.error.ErrorCode;
@@ -65,19 +72,25 @@ public class ApprovalService {
     private final ProvisioningService provisioningService;
     private final TenantServiceClient tenantServiceClient;
     private final ApprovalProperties properties;
+    private final WorkflowDefinitionService workflowDefinitionService;
+    private final WorkflowEngine workflowEngine;
 
     public ApprovalService(ApprovalRepository repository,
                            ApprovalViewMapper viewMapper,
                            AutoDecisionService autoDecisionService,
                            ProvisioningService provisioningService,
                            TenantServiceClient tenantServiceClient,
-                           ApprovalProperties properties) {
+                           ApprovalProperties properties,
+                           WorkflowDefinitionService workflowDefinitionService,
+                           WorkflowEngine workflowEngine) {
         this.repository = repository;
         this.viewMapper = viewMapper;
         this.autoDecisionService = autoDecisionService;
         this.provisioningService = provisioningService;
         this.tenantServiceClient = tenantServiceClient;
         this.properties = properties;
+        this.workflowDefinitionService = workflowDefinitionService;
+        this.workflowEngine = workflowEngine;
     }
 
     // ------------------------------------------------------------------ create
@@ -98,22 +111,20 @@ public class ApprovalService {
             return viewMapper.toView(live.get());
         }
 
+        Optional<PublishedWorkflow> published = workflowDefinitionService.resolvePublished(request.workflowCode());
+        if (published.isPresent()) {
+            return createFromDefinition(request, published.get(), actor, plan, riskLevel, riskScore, reasons);
+        }
+        return createDefaultFlow(request, actor, plan, riskLevel, riskScore, reasons);
+    }
+
+    /** Built-in fallback flow used when no published workflow definition applies (pre-v12 behaviour). */
+    private ApprovalView createDefaultFlow(ApprovalCreateRequest request, String actor, String plan,
+                                           String riskLevel, Integer riskScore, List<String> reasons) {
         Instant now = Instant.now();
-        ApprovalEntity approval = new ApprovalEntity();
-        approval.setId(UUID.randomUUID().toString());
-        approval.setTenantId(tenantId);
-        approval.setTenantCode(request.tenantCode().trim());
-        approval.setPlan(plan);
+        ApprovalEntity approval = buildEntity(request, plan, riskLevel, riskScore, reasons, now);
         approval.setState(ApprovalState.RISK_CHECK);
         approval.setCurrentNode(WorkflowNodes.RISK_CHECK);
-        approval.setRiskLevel(riskLevel);
-        approval.setRiskScore(riskScore);
-        approval.setAutoDecided(false);
-        approval.setEscalated(false);
-        approval.setReasons(reasons);
-        approval.setCreatedAt(now);
-        approval.setUpdatedAt(now);
-        approval.setVersion(0);
         repository.insert(approval);
 
         addNode(approval, WorkflowNodes.RISK_CHECK, NodeType.AUTO, NodeState.APPROVED, null,
@@ -123,6 +134,10 @@ public class ApprovalService {
         repository.appendTimeline(approval.getId(), "system", "RISK_CHECK",
                 "riskLevel=" + riskLevel + " riskScore=" + riskScore
                         + (reasons.isEmpty() ? "" : " reasons=" + String.join("; ", reasons)));
+        if (request.workflowCode() != null && !request.workflowCode().isBlank()) {
+            repository.appendTimeline(approval.getId(), actor, "WORKFLOW_FALLBACK",
+                    "no published workflow for code=" + request.workflowCode() + ", default flow used");
+        }
 
         approval.setState(ApprovalState.AUTO_DECISION);
         approval.setCurrentNode(WorkflowNodes.AUTO_DECISION);
@@ -131,6 +146,87 @@ public class ApprovalService {
         addNode(approval, WorkflowNodes.AUTO_DECISION, NodeType.AUTO, NodeState.PENDING, null, null, null, null, null);
 
         return runAutoDecision(approval, actor);
+    }
+
+    /** Creates an approval whose nodes/decision come from a published workflow definition (v12). */
+    private ApprovalView createFromDefinition(ApprovalCreateRequest request, PublishedWorkflow workflow, String actor,
+                                              String plan, String riskLevel, Integer riskScore, List<String> reasons) {
+        Instant now = Instant.now();
+        ApprovalEntity approval = buildEntity(request, plan, riskLevel, riskScore, reasons, now);
+        WorkflowDefinitionModel model = workflow.model();
+        String entryNode = model.entry() == null || model.entry().id() == null
+                ? WorkflowNodes.RISK_CHECK
+                : Texts.truncate(model.entry().id(), 32);
+        approval.setState(ApprovalState.RISK_CHECK);
+        approval.setCurrentNode(entryNode);
+        repository.insert(approval);
+        repository.appendTimeline(approval.getId(), actor, "CREATED",
+                "tenant=" + approval.getTenantCode() + " workflow=" + workflow.code() + "@" + workflow.version()
+                        + " plan=" + plan + " risk=" + riskLevel + "/" + riskScore);
+        repository.appendTimeline(approval.getId(), actor, "WORKFLOW_SELECTED",
+                "code=" + workflow.code() + " version=" + workflow.version()
+                        + " nodes=" + model.flatten().size());
+
+        WorkflowPlan planResult = workflowEngine.plan(approval, workflow);
+        Instant plannedAt = Instant.now();
+        for (PlannedNode planned : planResult.nodes()) {
+            boolean decided = planned.state() == NodeState.APPROVED;
+            addNode(approval, planned.nodeId(), planned.dbNodeType(), planned.state(), planned.role(),
+                    decided ? "workflow-engine" : null,
+                    decided ? plannedAt : null,
+                    planned.comment(), planned.slaHours());
+            repository.appendTimeline(approval.getId(), "workflow-engine",
+                    Texts.truncate(planned.nodeType(), 64), Texts.truncate(planned.comment(), 1024));
+        }
+        repository.appendTimeline(approval.getId(), actor, "WORKFLOW_PLAN",
+                "code=" + workflow.code() + " version=" + workflow.version()
+                        + " nodes=" + planResult.nodes().size()
+                        + (planResult.annotations().isEmpty()
+                        ? "" : " notes=" + String.join("; ", planResult.annotations())));
+
+        if (planResult.waitingAtHuman()) {
+            approval.setState(ApprovalState.PENDING_APPROVAL);
+            approval.setCurrentNode(Texts.truncate(planResult.humanNodeId(), 32));
+            approval.setAutoDecided(false);
+            approval.setSlaDueAt(Instant.now().plusSeconds(planResult.humanSlaHours() * 3600L));
+            approval.setUpdatedAt(Instant.now());
+            save(approval);
+            repository.appendTimeline(approval.getId(), actor, "ROUTED_TO_APPROVAL",
+                    "definition node=" + planResult.humanNodeId() + " role=" + planResult.humanRole()
+                            + " slaHours=" + planResult.humanSlaHours());
+            log.info("approval {} uses workflow {} v{} and waits at human node {}",
+                    approval.getId(), workflow.code(), workflow.version(), planResult.humanNodeId());
+            return viewMapper.toView(reload(approval.getId()));
+        }
+
+        AutoDecisionOutcome outcome = planResult.decision();
+        if (outcome == null) {
+            outcome = new AutoDecisionOutcome(AutoDecision.NEEDS_REVIEW, WorkflowNodes.ROLE_L1,
+                    properties.getL1SlaHours(), "workflow-definition", "definition produced no decision");
+        }
+        return switch (outcome.decision()) {
+            case AUTO_APPROVE -> autoApprove(approval, outcome);
+            case REJECT -> autoReject(approval, outcome);
+            case NEEDS_REVIEW, NONE -> routeToHuman(approval, outcome, actor);
+        };
+    }
+
+    private ApprovalEntity buildEntity(ApprovalCreateRequest request, String plan, String riskLevel,
+                                       Integer riskScore, List<String> reasons, Instant now) {
+        ApprovalEntity approval = new ApprovalEntity();
+        approval.setId(UUID.randomUUID().toString());
+        approval.setTenantId(request.tenantId().trim());
+        approval.setTenantCode(request.tenantCode().trim());
+        approval.setPlan(plan);
+        approval.setRiskLevel(riskLevel);
+        approval.setRiskScore(riskScore);
+        approval.setAutoDecided(false);
+        approval.setEscalated(false);
+        approval.setReasons(reasons);
+        approval.setCreatedAt(now);
+        approval.setUpdatedAt(now);
+        approval.setVersion(0);
+        return approval;
     }
 
     private ApprovalView runAutoDecision(ApprovalEntity approval, String actor) {

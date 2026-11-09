@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Login / token / {@code /api/auth/me} behaviour. */
-@SpringBootTest
+@SpringBootTest(properties = "tenancy.auth.preset-fallback-enabled=true")
 @AutoConfigureMockMvc
 class AuthControllerTest {
 

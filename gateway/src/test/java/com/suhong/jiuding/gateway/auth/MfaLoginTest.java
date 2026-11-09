@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * MFA two-step login (docs/16 搂3): the password step returns a challenge, and
  * {@code POST /api/auth/login/mfa} exchanges it plus a TOTP code for the JWT.
  */
-@SpringBootTest
+@SpringBootTest(properties = "tenancy.auth.preset-fallback-enabled=true")
 @AutoConfigureMockMvc
 class MfaLoginTest {
 

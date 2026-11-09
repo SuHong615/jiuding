@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Reverse proxy behaviour against an embedded downstream stub. */
-@SpringBootTest
+@SpringBootTest(properties = "tenancy.auth.preset-fallback-enabled=true")
 @AutoConfigureMockMvc
 class ProxyForwardingTest {
 

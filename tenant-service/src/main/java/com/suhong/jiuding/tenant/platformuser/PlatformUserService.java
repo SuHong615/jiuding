@@ -186,6 +186,44 @@ public class PlatformUserService {
                 "platform user " + existing.username() + " deleted");
     }
 
+    // ------------------------------------------------------------------ bootstrap
+
+    /**
+     * Creates the first platform user from environment configuration (docs/23 section 5).
+     * No caller scope is required: this only runs at startup when the table is empty and a
+     * non blank password was supplied through {@code TENANCY_PLATFORM_BOOTSTRAP_*}.
+     */
+    public PlatformUserView bootstrap(String username, String password, List<String> roles) {
+        String normalized = normalizeUsername(username);
+        if (repository.count() > 0) {
+            throw BizException.conflict("platform users already exist");
+        }
+        String secret = Texts.blankToNull(password);
+        if (secret == null) {
+            throw BizException.invalid("bootstrap password is required");
+        }
+        if (repository.findByUsername(normalized).isPresent()) {
+            throw BizException.conflict("platform username already exists: " + normalized);
+        }
+        List<String> normalizedRoles = normalizeRoles(roles);
+        var now = TimeUtil.now();
+        PlatformUserRow row = new PlatformUserRow(
+                UUID.randomUUID().toString(),
+                normalized,
+                null,
+                encode(secret),
+                PlatformUserView.joinRoles(normalizedRoles),
+                DEFAULT_STATUS,
+                null,
+                now,
+                now,
+                null);
+        repository.insert(row);
+        audit("bootstrap", "PLATFORM_USER_BOOTSTRAPPED",
+                "platform user " + normalized + " bootstrapped (roles=" + row.roles() + ")");
+        return PlatformUserView.of(row);
+    }
+
     // ------------------------------------------------------------------ internal authentication
 
     public PlatformUserAuthResponse authenticate(PlatformUserAuthRequest request) {

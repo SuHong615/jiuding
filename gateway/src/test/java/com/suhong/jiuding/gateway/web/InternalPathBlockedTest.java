@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code /internal/**} is a service-to-service surface and must never be exposed by the
  * gateway: every request is answered with a uniform 404 and nothing is proxied.
  */
-@SpringBootTest
+@SpringBootTest(properties = "tenancy.auth.preset-fallback-enabled=true")
 @AutoConfigureMockMvc
 class InternalPathBlockedTest {
 

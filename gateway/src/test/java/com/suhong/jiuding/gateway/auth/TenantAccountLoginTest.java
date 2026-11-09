@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * tenant-service {@code POST /internal/auth/authenticate} and issues a JWT carrying
  * {@code tid} and {@code oid}.
  */
-@SpringBootTest
+@SpringBootTest(properties = "tenancy.auth.preset-fallback-enabled=true")
 @AutoConfigureMockMvc
 class TenantAccountLoginTest {
 

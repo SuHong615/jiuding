@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * (10/60s) is asserted through the configuration test below.
  */
 @SpringBootTest(properties = {
+        "tenancy.auth.preset-fallback-enabled=true",
         "tenancy.auth.login-rate-limit.enabled=true",
         "tenancy.auth.login-rate-limit.max-requests=10",
         "tenancy.auth.login-rate-limit.window-seconds=5"

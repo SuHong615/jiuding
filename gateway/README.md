@@ -33,6 +33,11 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 | `TENANCY_OIDC_STATE_SECRET` / `TENANCY_OIDC_STATE_TTL_SECONDS` | 共享 JWT secret / `600` | state HMAC 密钥与有效期 |
 | `TENANCY_OIDC_DISCOVERY_CACHE_SECONDS` / `TENANCY_OIDC_REQUEST_TIMEOUT_MS` | `300` / `5000` | 发现文档缓存 / IdP 请求超时 |
 | `TENANCY_OIDC_PROVIDERS_CACHE_SECONDS` | `60` | 动态 SSO Provider 列表（tenant-service `/internal/sso-providers/enabled`）缓存秒数；v10 起优先于环境变量静态配置 |
+| `TENANCY_PRESET_FALLBACK_ENABLED` | `false` | v12 平台登录本地预置用户回退开关（生产必须 false；本地/测试可 true） |
+| `TENANCY_MOCK_OIDC_ENABLED` | `false` | v12 dev-only 内置 Mock OIDC IdP 开关（生产必须 false） |
+| `TENANCY_MOCK_OIDC_ISSUER` | 空 | Mock OIDC issuer 覆盖（空则按请求 Host 自动推导 `/mock-oidc`） |
+| `TENANCY_MOCK_OIDC_USERNAME` / `TENANCY_MOCK_OIDC_DISPLAY_NAME` / `TENANCY_MOCK_OIDC_ROLES` | `mock-user` / `Mock User` / `TENANT_ADMIN` | Mock userinfo 返回的 sub/name/roles |
+| `TENANCY_MOCK_OIDC_CODE_TTL_SECONDS` / `TENANCY_MOCK_OIDC_TOKEN_TTL_SECONDS` | `120` / `300` | Mock authorization code / access token TTL |
 | `TENANT_SERVICE_URL` | `http://localhost:8081` | 租户服务 |
 | `APPROVAL_SERVICE_URL` | `http://localhost:8082` | 审批服务 |
 | `AGENT_SERVICE_URL` | `http://localhost:8083` | Agent/Skill 服务 |
@@ -73,7 +78,7 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 | GET | `/api/auth/oidc/callback` | v6 OIDC：校验 state → 换 token → userinfo → 签发 JWT → 302 到前端 `#token=...&username=...`；失败 `#error=...` |
 | GET | `/api/auth/oidc/providers` | v10 公开的启用 SSO Provider 列表（`[{code,name,loginUrl}]`，`authorize?provider=<code>` 选择） |
 
-认证由 `tenancy-common` 的 `AuthFilter` 统一处理；`/api/auth/login`、`/actuator/health`、`/api/public/**`、`/scim/**` 在白名单。
+认证由 `tenancy-common` 的 `AuthFilter` 统一处理；`/api/auth/login`、`/actuator/health`、`/api/public/**`、`/scim/**`、`/mock-oidc/**`（仅 dev Mock OIDC 启用时有效）在白名单。
 代理透传 `Authorization`、`X-Tenant-Id`、`X-Request-Id`、`X-API-Key` 及 `Content-Type`；
 下游不可达返回 `502` + `ApiResponse{code:50200}`，不抛 500。
 登录错误统一为 `401 {code:40100,message:"invalid credentials"}`（不区分用户名/密码/租户）；
@@ -82,7 +87,8 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 ## 平台账号与多租户（v10，docs/20 §3）
 
 - 平台账号登录优先调用 tenant-service `POST /internal/platform-users/authenticate`（X-Internal-Token，PBKDF2 在租户侧校验）；
-  下游不可用/账号不存在时回退到本地预置用户目录（仅兼容，任何 API 都不暴露预置列表）。
+  v12 起仅当 `tenancy.auth.preset-fallback-enabled=true`（`TENANCY_PRESET_FALLBACK_ENABLED`，生产默认 false）才回退本地预置用户目录
+  （兼容/本地测试用，任何 API 都不暴露预置列表）；关闭时只走 DB + 租户账号。
 - `tenantCode` 为空：平台账号 → 本地预置 → 租户成员解析；同一 username+密码命中多个租户时返回
   `200 {mfaRequired:false, tenantSelectionRequired:true, tenants:[{tenantId,tenantCode,name}]}`；显式 `tenantCode` 直接走租户认证。
 - `/api/auth/tenants`（v10.1）使用当前 JWT 的 `accountId/username/currentTenantId` 调 tenant-service
@@ -99,6 +105,14 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 - `GET /api/auth/oidc/providers` 返回 `[{code,name,loginUrl}]`（不含 secret）；`authorize?provider=<code>` 选择 Provider，
   provider code 绑定进签名 state，callback 使用对应 issuer/client/secret/frontendRedirect；未知 provider → 404；多个 Provider
   未指定 code → 400/404 明确提示。未启用任何 Provider 时保持 v6 disabled 行为。
+
+## Mock OIDC（v12，dev-only，docs/23 §4）
+
+- 仅 `tenancy.auth.mock-oidc.enabled=true`（`TENANCY_MOCK_OIDC_ENABLED`）时注册；生产保持关闭。
+- 端点：`GET /mock-oidc/.well-known/openid-configuration`、`GET /mock-oidc/authorize`（直接 302 回 `redirect_uri?code=...&state=...`）、
+  `POST /mock-oidc/token`（authorization_code + PKCE S256 校验）、`GET /mock-oidc/userinfo`（`sub/name/roles`）。
+- 用途：把 SSO Provider issuer 指向 `http://<gateway>/mock-oidc`，即可在无外部 IdP 环境跑通 authorize→callback→JWT 全链路；
+  关闭时 `/mock-oidc/**` 固定 404。
 
 ## OIDC / SSO（v6，docs/16 §2）
 

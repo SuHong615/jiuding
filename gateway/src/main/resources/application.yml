@@ -57,6 +57,9 @@ tenancy:
       # v6 OIDC/SSO endpoints (docs/16 §2) are part of the login flow and unauthenticated.
       - /api/auth/oidc
       - /api/auth/oidc/**
+      # v12 dev-only Mock OIDC IdP (docs/23 §4); the controller itself is conditional.
+      - /mock-oidc
+      - /mock-oidc/**
       # /internal/** is a service-to-service surface that must never be exposed by the
       # gateway. It is whitelisted so the shared AuthFilter does not answer 401/500 first;
       # InternalPathController always replies with a uniform 404 instead.
@@ -75,6 +78,18 @@ tenancy:
       - /scim/**
       - /error
   auth:
+    # v12 platform-login fallback switch (docs/23 §5): when false (production default) only
+    # the tenant-service platform database is consulted; preset users are ignored.
+    preset-fallback-enabled: ${TENANCY_PRESET_FALLBACK_ENABLED:false}
+    # v12 dev-only built-in Mock OIDC IdP (docs/23 §4). NEVER enable in production.
+    mock-oidc:
+      enabled: ${TENANCY_MOCK_OIDC_ENABLED:false}
+      issuer: ${TENANCY_MOCK_OIDC_ISSUER:}
+      username: ${TENANCY_MOCK_OIDC_USERNAME:mock-user}
+      display-name: ${TENANCY_MOCK_OIDC_DISPLAY_NAME:Mock User}
+      roles: ${TENANCY_MOCK_OIDC_ROLES:TENANT_ADMIN}
+      code-ttl-seconds: ${TENANCY_MOCK_OIDC_CODE_TTL_SECONDS:120}
+      token-ttl-seconds: ${TENANCY_MOCK_OIDC_TOKEN_TTL_SECONDS:300}
     # Optional JSON array override, e.g.
     # [{"userId":"u-admin","username":"admin","password":"Admin@123","tenantId":null,"roles":["PLATFORM_ADMIN"]}]
     users-json: ${TENANCY_USERS:}

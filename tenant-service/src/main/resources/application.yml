@@ -62,6 +62,9 @@ tenancy:
     soft-deleted-tenant-days: ${TENANCY_RETENTION_SOFT_DELETED_TENANT_DAYS:180}
   # Hard cap for page size on list endpoints.
   max-page-size: 100
+  # PostgreSQL row level security (docs/23 section 2). H2/dev/test keeps it disabled.
+  rls:
+    enabled: ${TENANCY_RLS_ENABLED:false}
   # Skill-driven risk review executed through agent-service before approval creation.
   risk-review:
     enabled: ${TENANCY_RISK_REVIEW_ENABLED:true}
@@ -126,3 +129,10 @@ spring:
     username: ${TENANT_DB_USER:tenancy}
     password: ${TENANT_DB_PASSWORD:tenancy}
     driver-class-name: org.postgresql.Driver
+  flyway:
+    # PostgreSQL-only migrations (RLS) live outside the H2-compatible base folder.
+    locations: classpath:db/migration,classpath:db/postgresql
+
+tenancy:
+  rls:
+    enabled: ${TENANCY_RLS_ENABLED:true}

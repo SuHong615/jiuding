@@ -22,6 +22,7 @@ import com.suhong.jiuding.common.error.ErrorCode;
 import com.suhong.jiuding.common.security.AuthContext;
 import com.suhong.jiuding.common.security.JwtService;
 import com.suhong.jiuding.common.security.Principal;
+import com.suhong.jiuding.gateway.config.AuthFallbackProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -61,14 +62,17 @@ public class AuthService {
     private final TenantAuthClient tenantAuthClient;
     private final PlatformAuthClient platformAuthClient;
     private final TenantIdentityCache identityCache;
+    private final AuthFallbackProperties fallbackProperties;
 
     public AuthService(UserStore userStore, JwtService jwtService, TenantAuthClient tenantAuthClient,
-                       PlatformAuthClient platformAuthClient, TenantIdentityCache identityCache) {
+                       PlatformAuthClient platformAuthClient, TenantIdentityCache identityCache,
+                       AuthFallbackProperties fallbackProperties) {
         this.userStore = userStore;
         this.jwtService = jwtService;
         this.tenantAuthClient = tenantAuthClient;
         this.platformAuthClient = platformAuthClient;
         this.identityCache = identityCache;
+        this.fallbackProperties = fallbackProperties;
     }
 
     public LoginResponse login(String username, String password, String tenantCode) {
@@ -103,14 +107,17 @@ public class AuthService {
             log.debug("platform account login unavailable, trying legacy presets: {}", ex.getMessage());
         }
 
-        // 2) Legacy preset users (kept for tests / migration; never exposed as a list).
-        Optional<TenantUser> found = userStore.find(username);
-        if (found.isPresent()) {
-            TenantUser user = found.get();
-            if (!PasswordHasher.matches(password, user.passwordHash())) {
-                throw new BizException(ErrorCode.UNAUTHORIZED, "invalid credentials");
+        // 2) Legacy preset users — only when tenancy.auth.preset-fallback-enabled=true
+        //    (docs/23 §5: production defaults to DB-only platform accounts).
+        if (fallbackProperties.isPresetFallbackEnabled()) {
+            Optional<TenantUser> found = userStore.find(username);
+            if (found.isPresent()) {
+                TenantUser user = found.get();
+                if (!PasswordHasher.matches(password, user.passwordHash())) {
+                    throw new BizException(ErrorCode.UNAUTHORIZED, "invalid credentials");
+                }
+                return issue(user.toPrincipal(), PrincipalView.AUTH_PLATFORM, null);
             }
-            return issue(user.toPrincipal(), PrincipalView.AUTH_PLATFORM, null);
         }
 
         // 3) Tenant membership resolution by username+password (0/1 → account, 2+ → selection).

@@ -81,6 +81,12 @@ public class PlatformUserRepository {
                 .stream().findFirst();
     }
 
+    /** Total row count, used by the empty-table bootstrap guard (docs/23 section 5). */
+    public long count() {
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM platform_users", Long.class);
+        return count == null ? 0L : count;
+    }
+
     public void insert(PlatformUserRow row) {
         jdbc.update("INSERT INTO platform_users (id, username, display_name, password_hash,"
                         + " roles, status, email, created_at, updated_at, last_login_at)"

@@ -21,7 +21,7 @@ import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;
 
-/** DTO from docs/02-api-contracts.md section 3. */
+/** DTO from docs/02-api-contracts.md section 3 (v12 adds an optional workflow code). */
 public record ApprovalCreateRequest(
         @NotBlank(message = "tenantId is required") String tenantId,
         @NotBlank(message = "tenantCode is required") String tenantCode,
@@ -29,5 +29,6 @@ public record ApprovalCreateRequest(
         String riskLevel,
         Integer riskScore,
         List<String> reasons,
-        String requestedBy) {
+        String requestedBy,
+        String workflowCode) {
 }

@@ -27,6 +27,9 @@ tenancy:
   security:
     api-keys: dev-mcp-key
     internal-token: dev-internal-token
+  # PostgreSQL RLS is disabled on H2 (docs/23 section 2); the wrapper is not installed.
+  rls:
+    enabled: false
   # Deterministically unreachable agent tier: risk review / rating skill degrade to local rules.
   agent-service:
     url: http://127.0.0.1:1

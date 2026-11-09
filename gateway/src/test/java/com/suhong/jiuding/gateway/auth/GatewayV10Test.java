@@ -57,6 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * tenant selection / switching and dynamic SSO providers loaded from tenant-service.
  */
 @SpringBootTest(properties = {
+        "tenancy.auth.preset-fallback-enabled=true",
         "tenancy.auth.oidc.enabled=false",
         "tenancy.auth.oidc.providers-cache-seconds=60"
 })
