@@ -40,6 +40,7 @@ import { ScimPage } from './pages/ScimPage'
 import { PlatformUsersPage } from './pages/PlatformUsersPage'
 import { WorkflowsPage } from './pages/WorkflowsPage'
 import { SsoProvidersPage } from './pages/SsoProvidersPage'
+import { PlatformAuditsPage } from './pages/PlatformAuditsPage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { token } = useAuth()
@@ -107,6 +108,7 @@ export function App() {
         <Route path="permissions" element={<PermissionsPage />} />
         <Route path="platform/users" element={<PlatformUsersPage />} />
         <Route path="platform/sso" element={<SsoProvidersPage />} />
+        <Route path="platform/audits" element={<PlatformAuditsPage />} />
         <Route path="security/mfa" element={<SecurityMfaPage />} />
         <Route path="scim" element={<ScimPage />} />
         <Route path="*" element={<NotFoundPage />} />

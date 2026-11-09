@@ -67,6 +67,7 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 | * | `/api/platform/users`、`/api/platform/users/**` | → tenant-service（v10 平台账号管理，需平台管理员 JWT） |
 | * | `/api/platform/sso-providers`、`/api/platform/sso-providers/**` | → tenant-service（v10 SSO Provider 配置管理） |
 | * | `/api/workflows`、`/api/workflows/**` | → tenant-service（v10 租户生命周期工作流只读视图） |
+| * | `/api/platform/audits`、`/api/platform/audits/**` | → tenant-service（v11 平台审计日志/导出，需平台管理员 JWT） |
 | GET | `/api/auth/oidc/status` | v6 OIDC：`{enabled, providerName, loginUrl}`（白名单） |
 | GET | `/api/auth/oidc/authorize` | v6 OIDC：返回 `{authorizationUrl}`（`?redirect=true` 时 302 到 IdP），含签名 state + PKCE S256 |
 | GET | `/api/auth/oidc/callback` | v6 OIDC：校验 state → 换 token → userinfo → 签发 JWT → 302 到前端 `#token=...&username=...`；失败 `#error=...` |

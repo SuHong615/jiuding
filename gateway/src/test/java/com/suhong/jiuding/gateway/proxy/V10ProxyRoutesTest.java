@@ -134,6 +134,54 @@ class V10ProxyRoutesTest {
                 .andExpect(jsonPath("$.data.routedBy").value("tenant-service"));
     }
 
+    @Test
+    void platformAuditsAreProxiedWithQueryString() throws Exception {
+        mockMvc.perform(get("/api/platform/audits?tenantId=t-1&page=2&size=20")
+                        .header("Authorization", "Bearer " + adminToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.routedBy").value("tenant-service"));
+        assertThat(TENANT.lastRequest().path()).isEqualTo("/api/platform/audits");
+        assertThat(TENANT.lastRequest().query()).contains("tenantId=t-1");
+
+        mockMvc.perform(get("/api/platform/audits/export?format=csv")
+                        .header("Authorization", "Bearer " + adminToken()))
+                .andExpect(status().isOk());
+        assertThat(TENANT.lastRequest().path()).isEqualTo("/api/platform/audits/export");
+    }
+
+    @Test
+    void platformAuditsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/platform/audits"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(40100));
+        mockMvc.perform(get("/api/platform/audits").header("Authorization", "Bearer not-a-jwt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(40100));
+    }
+
+    @Test
+    void auditsRouteDoesNotShadowLocalOrExistingProxyRoutes() throws Exception {
+        String token = adminToken();
+        // Local endpoints stay local.
+        int before = TENANT.requests().size();
+        mockMvc.perform(get("/api/platform/overview").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenants").exists());
+        boolean overviewProxied = TENANT.requests().stream()
+                .skip(before)
+                .anyMatch(request -> request.path().startsWith("/api/platform/overview"));
+        assertThat(overviewProxied).isFalse();
+
+        // Existing v10 routes keep working next to the new audits route.
+        mockMvc.perform(get("/api/platform/users").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.routedBy").value("tenant-service"));
+        assertThat(TENANT.lastRequest().path()).isEqualTo("/api/platform/users");
+        mockMvc.perform(get("/api/platform/roles").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.routedBy").value("tenant-service"));
+    }
+
     private String adminToken() {
         return jwtService.issue(new Principal("u-admin", "admin", null,
                 Set.of("PLATFORM_ADMIN"), "JWT"));

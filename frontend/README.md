@@ -103,6 +103,13 @@ Node 版本：>= 18（本机验证 Node 25 / npm 11）。开发环境依赖网�
 - 工作流页：租户生命周期阶段 + 活动 + Skill/Agent + 产出；优先 `/api/workflows/tenant-lifecycle`，失败/空数据回退内置模板。
 - MCP 导航置顶；页面顶部提供获取配置 / API Keys / 调用审计 / 外部 MCP 服务器（右侧抽屉）入口。
 
+## v11 平台审计中心
+
+- 平台「审计中心」`/platform/audits`（仅平台管理员）：租户下拉、动作输入（候选 datalist）、from/to 日期、关键词筛选；
+  分页表格展示时间 / 租户 code+name / 操作人 / 动作 / 详情摘要（截断），含加载/空/错误态。
+- 「导出 CSV」带当前筛选条件下载（文件名为服务端 Content-Disposition，回退 `platform-audits-<date>.csv`）。
+- 平台导航按 `/api/me/permissions` 与平台管理员角色显隐。
+
 ## 工程约定
 
 - `src/api/client.ts`：统一 fetch 封装，解析 `{code,message,data}`，`code !== 0` 抛 `ApiError`；

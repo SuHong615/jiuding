@@ -45,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/permissions', label: '权限管理', icon: 'shield', group: '平台', keywords: ['RBAC', 'ROLE', 'PERMISSION'] },
   { path: '/platform/users', label: '平台用户', icon: 'user', group: '平台', keywords: ['PLATFORM_USER', 'USER'] },
   { path: '/platform/sso', label: 'SSO 配置', icon: 'key', group: '平台', keywords: ['SSO', 'OIDC'] },
+  { path: '/platform/audits', label: '审计中心', icon: 'file', group: '平台', keywords: ['AUDIT'] },
   { path: '/scim', label: 'SCIM 配置', icon: 'key', group: '平台', keywords: ['SCIM'] },
   { path: '/mcp/keys', label: 'MCP 凭据', icon: 'key', group: '平台', keywords: ['MCP', 'KEY'] },
   { path: '/mcp/audits', label: 'MCP 调用审计', icon: 'file', group: '平台', keywords: ['MCP', 'AUDIT'] },

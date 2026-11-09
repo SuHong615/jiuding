@@ -4565,6 +4565,18 @@ textarea.input {
   }
 }
 
+.filter-action {
+  width: 190px;
+  font-size: 12px;
+}
+
+.audit-detail {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ------------------------------ 工具类 ------------------------------ */
 
 .muted {

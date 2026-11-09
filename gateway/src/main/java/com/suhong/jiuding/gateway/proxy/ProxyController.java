@@ -142,4 +142,11 @@ public class ProxyController {
         proxyService.forward(request, response, new ServiceRoute(
                 "tenant-service", properties.getTenantServiceUrl(), properties.getRequestTimeoutMs()));
     }
+
+    /** v11 platform audit log (JWT, platform-admin enforced by tenant-service). */
+    @RequestMapping({"/api/platform/audits", "/api/platform/audits/**"})
+    public void proxyPlatformAudits(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        proxyService.forward(request, response, new ServiceRoute(
+                "tenant-service", properties.getTenantServiceUrl(), properties.getRequestTimeoutMs()));
+    }
 }

@@ -8,7 +8,7 @@
 | 维度 | 结果 |
 |---|---|
 | 后端编译（9 模块） | ✅ BUILD SUCCESS |
-| 自动化测试 | ✅ **591 个测试全部通过**（0 失败 / 0 错误 / 0 跳过） |
+| 自动化测试 | ✅ **601 个测试全部通过**（0 失败 / 0 错误 / 0 跳过） |
 | v1 端到端 E2E | ✅ **16/16 PASS**（`integration/verify.ps1`，k8s） |
 | v2 身份域 E2E | ✅ **31/31 PASS**（`tests/e2e-v2.ps1`：组织/账号/评级/软删） |
 | v3 租户登录/RBAC E2E | ✅ **42/42 PASS**（`tests/e2e-v3.ps1`：租户账号登录、ORG_ADMIN 子树、MEMBER 只读、auditor 跨租户、锁定） |
@@ -25,17 +25,17 @@
 
 **结论：v1（多租户+审批自动化+采集+MCP）、v2（组织/账号/评级/开发者工具极简 UI）、v3（租户账号登录+五档 RBAC+评级周期化）、v4（账号安全/合规导出/评级增量/生产化）全部在 k3s 与 Docker Compose 双环境端到端验证通过。**
 
-## 2. 测试明细（全量 591）
+## 2. 测试明细（全量 601）
 
 | 模块 | 测试数 | 覆盖重点 |
 |---|---|---|
 | `agent-kernel` | 2 | AgentScope 2.0.4 ReActAgent 工具调用通路 |
 | `tenancy-common` | 18 | JWT（含 oid）/AuthFilter/内部令牌/租户头/失败关闭 |
-| `tenant-service` | **249** | v3 86 + v4 16：登录事件审计（IP/UA/原因）、解锁、本人改密、审计 CSV 导出、PII 掩码、评级 delta/等级变化审计、内部 refresh、组织树/评级事务/软删 |
+| `tenant-service` | **256** | v3 86 + v4 16：登录事件审计（IP/UA/原因）、解锁、本人改密、审计 CSV 导出、PII 掩码、评级 delta/等级变化审计、内部 refresh、组织树/评级事务/软删 |
 | `approval-service` | 35 | 工作流/自动决策/SLA/权限/下游重试 |
 | `agent-service` | **80** | 规则引擎、5 个技能包（RATING 类型）、Agent 运行 |
 | `mcp-service` | **45** | 22 工具 schema/调用映射、数组→对象 structuredContent、错误映射、SSE、鉴权 |
-| `gateway` | **84** | 登录（平台 + 租户双通道）、登录限流（429/42900）、IP/UA 透传、代理、聚合、`/internal/**` 404 |
+| `gateway` | **87** | 登录（平台 + 租户双通道）、登录限流（429/42900）、IP/UA 透传、代理、聚合、`/internal/**` 404 |
 | `tenancy-cli` | **59** | 原有命令 + `auth login --tenant-code` / `auth whoami`、org/account/rating 命令 |
 
 复现：`mvn -B -f pom.xml test`。
@@ -197,6 +197,12 @@
 - 工作流：`GET /api/workflows/tenant-lifecycle` states=10、transitions=29、activities 全映射 skillId。
 - E2E：`tests/e2e-v10.ps1` **34/34 PASS**；`tests/e2e-v8.ps1` 27 PASS/1 SKIP；verify **20/20 PASS**。
 - 迁移：tenant_db Flyway **V10**（V9 platform_users/sso_providers，V10 password_fingerprint）。
+## 4.19 v11 平台审计中心实测（2026-11-09）
+
+- `GET /api/platform/audits`：跨租户聚合（tenantCode/tenantName）、tenantId/action/keyword/时间过滤、分页、at DESC；仅平台管理员（租户管理员/AUDITOR 403）。
+- `GET /api/platform/audits/export`：text/csv attachment、RFC4180 转义、≤10000 行、写 `PLATFORM_AUDIT_EXPORTED`。
+- 前端「平台 → 审计中心」：筛选/分页/CSV 导出/权限显隐。
+- E2E：`tests/e2e-v11.ps1` **24/24 PASS**；网关 87、tenant 256 全绿；verify **21/21 PASS**（技能版本链首次因滚动重启瞬断，重跑 13/13）。
 ## 5. 架构审查与最佳实践落实（docs/11、docs/13）
 
 | 主题 | 决策 |
@@ -229,7 +235,7 @@
 ## 7. 复现命令
 
 ```powershell
-mvn -B -f D:\deepseekHarness\tenancy-center\pom.xml test          # 591 tests
+mvn -B -f D:\deepseekHarness\tenancy-center\pom.xml test          # 601 tests
 cd D:\deepseekHarness\tenancy-center\frontend; npm run build
 # k8s 更新与验收
 wsl -d opencode-docker -e /bin/sh /mnt/d/deepseekHarness/tenancy-center/deploy/k8s/update-images.sh
@@ -243,13 +249,13 @@ sh deploy/k8s/prod/apply-prod.sh
 sh deploy/k8s/zero-downtime-check.sh 90
 ```
 
-## 8. 交付规模（v10）
+## 8. 交付规模（v11）
 
 - 后端 Java：340+ 文件；前端 65+ TS/TSX 文件
 - 技能：5 内置 + 上传/审核/版本/调试/启停；MCP 工具 22；RBAC 43 权限/5 内置角色
 - 安全：OIDC/SSO、MFA、SCIM 2.0、账号安全、登录限流、K8s 随机 Secret、secret-scan CI
 - 配额：席位/组织强制、用量 API、网关 API RPM 限流；备份/恢复脚本
 - 文档：18 份（新增 docs/17 配额/备份）
-- 测试：591 自动化测试 + 31 v2 + 42 v3 + 20 v4 + 46 v5 + 13 技能 + 25 v6 + 31 v6B + 23 v7 + 27 v8 + 15 MCP 断言
+- 测试：601 自动化测试 + 31 v2 + 42 v3 + 20 v4 + 46 v5 + 13 技能 + 25 v6 + 31 v6B + 23 v7 + 27 v8 + 15 MCP 断言
 - 生产化：2 副本 + PDB ×6 + HPA ×2 + CronJob ×2；零中断验证通过
 - UI 截图：`docs/assets/ui-login-v3.png`、`ui-tenants.png`、`ui-org.png`

@@ -314,6 +314,19 @@ export interface TenantOffboardRequest {
   reason: string
 }
 
+/* ------------------------------ v11：平台审计中心（docs/21） ------------------------------ */
+
+export interface PlatformAuditView {
+  id?: string
+  tenantId?: string
+  tenantCode?: string | null
+  tenantName?: string | null
+  at?: string | null
+  actor?: string | null
+  action?: string | null
+  detail?: string | null
+}
+
 export interface TenantOverview {
   total?: number
   byStatus?: Record<string, number>

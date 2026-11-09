@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- v11 平台审计中心：跨租户审计查询/过滤/分页/CSV 导出 + 平台审计页
 - v10 企业 SSO Provider 配置/动态 OIDC、平台账号管理、多租户登录选择与免密切换、MCP 控制台重构、租户生命周期工作流视图
 - v9 权限强制层 Phase 1：`@RequirePermission` + 拦截器（roles→role_permissions 缓存、自定义角色即时生效、无权限 403）
 - v8 租户数据导出（默认脱敏/平台明文/审计）与离户（TERMINATED+软删+审计）；CLI `tenant export/offboard`；E2E v8

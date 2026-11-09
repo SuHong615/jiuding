@@ -496,6 +496,31 @@ function Test-V10Available {
     return [pscustomobject]@{ Available = $false; Detail = ('v10 API not deployed; workflow HTTP ' + $workflowStatus + '; platform users HTTP ' + $usersStatus) }
 }
 
+function Test-V11Available {
+    param([string]$Url, [string]$Token)
+    if ([string]::IsNullOrWhiteSpace($Token)) {
+        return [pscustomobject]@{ Available = $false; Detail = 'admin login failed; cannot probe v11 platform audit API' }
+    }
+    $headers = @{ Authorization = ("Bearer {0}" -f $Token) }
+    try {
+        $response = Invoke-WebRequest -Uri "$Url/api/platform/audits?page=0&size=1" -Headers $headers -UseBasicParsing -TimeoutSec 10
+        $payload = $response.Content | ConvertFrom-Json
+        $hasShape = ($null -ne $payload) -and ($null -ne $payload.data) -and
+            ($payload.data.PSObject.Properties.Name -contains 'items') -and
+            ($payload.data.PSObject.Properties.Name -contains 'total')
+        if ([int]$response.StatusCode -eq 200 -and $hasShape) {
+            return [pscustomobject]@{ Available = $true; Detail = ('GET /api/platform/audits -> 200 total=' + [string]$payload.data.total) }
+        }
+        return [pscustomobject]@{ Available = $false; Detail = 'platform audits response has no PageResult shape' }
+    }
+    catch {
+        $status = 0
+        $webResponse = $_.Exception.Response
+        if ($webResponse) { $status = [int]$webResponse.StatusCode }
+        return [pscustomobject]@{ Available = $false; Detail = ('GET /api/platform/audits -> HTTP ' + $status) }
+    }
+}
+
 # ---------------------------------------------------------------- static checks
 Write-Host '==> static checks' -ForegroundColor Cyan
 $composeFile = Join-Path $root 'deploy\docker-compose.yml'
@@ -535,7 +560,7 @@ if ($missingScripts.Count -eq 0) { Add-Result 'scripts' 'PASS' "$($requiredScrip
 else { Add-Result 'scripts' 'FAIL' ("missing: " + ($missingScripts -join ', ')) }
 
 $testsDir = Join-Path $root 'tests'
-$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-v7.ps1', 'e2e-v8.ps1', 'e2e-v10.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
+$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-v7.ps1', 'e2e-v8.ps1', 'e2e-v10.ps1', 'e2e-v11.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
 $missingTests = @()
 foreach ($test in $requiredTests) {
     if (-not (Test-Path (Join-Path $testsDir $test))) { $missingTests += $test }
@@ -579,6 +604,7 @@ else {
         Add-Result 'E2E v7 quota' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v8 export' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v10 chain' 'SKIP' 'gateway not ready'
+        Add-Result 'E2E v11 audit' 'SKIP' 'gateway not ready'
     }
     else {
         Add-Result 'gateway health' 'PASS' $BaseUrl
@@ -803,6 +829,25 @@ else {
         }
         else {
             Add-Result 'E2E v10 chain' 'SKIP' '-SkipE2E'
+        }
+
+        # ------------------------------------------------ v11 platform audit center checks
+        if (-not $SkipE2E) {
+            $v11 = Test-V11Available -Url $BaseUrl -Token $adminProbeToken
+            $e2eV11Script = Join-Path $testsDir 'e2e-v11.ps1'
+            if ($v11.Available -and (Test-Path $e2eV11Script)) {
+                Write-Host ''
+                Write-Host '==> tests/e2e-v11.ps1' -ForegroundColor Cyan
+                & $e2eV11Script -BaseUrl $BaseUrl -TimeoutSeconds $TimeoutSeconds
+                if ($LASTEXITCODE -eq 0) { Add-Result 'E2E v11 audit' 'PASS' 'cross-tenant audits + filters/pagination + CSV export + permissions' }
+                else { Add-Result 'E2E v11 audit' 'FAIL' "exit $LASTEXITCODE" }
+            }
+            else {
+                Add-Result 'E2E v11 audit' 'SKIP' $v11.Detail
+            }
+        }
+        else {
+            Add-Result 'E2E v11 audit' 'SKIP' '-SkipE2E'
         }
     }
 }

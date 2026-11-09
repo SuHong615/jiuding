@@ -20,6 +20,7 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 | `e2e-v7.ps1` | **v7 配额/用量/RPM E2E**（docs/17）：建租户（quotaSeats=2/quotaOrgUnits=2/quotaApiRpm=3）→ `GET /api/tenants/{id}/quota` 字段/状态 → 组织与账号按上限创建、超限 409 → CSV 导入（重复行 skipped + 超限行 failed，不中断）→ PUT 提升配额并校验 → 租户 JWT 网关 RPM 第 4 次 429/42901（未实现 SKIP）→ 无配额租户不受限 → 软删租户 |
 | `e2e-v8.ps1` | **v8 导出/离户 E2E**（docs/18）：数据准备（组织/账号/评级/审计）→ `export?mask=true` 结构与 PII 掩码 + `Content-Disposition` → 默认 mask、TENANT_ADMIN 只读掩码、admin `mask=false` 明文、非平台 403 → MEMBER/ORG_ADMIN 403 → `TENANT_EXPORTED` 审计 → 离户（reason 必填、仅平台管理员、ACTIVE/SUSPENDED、TERMINATED+deletedAt）→ 离户后 detail/export 404、重复离户 404/409、`TENANT_OFFBOARDED` 审计探测 → 清理 |
 | `e2e-v10.ps1` | **v10 平台身份/SSO/多租户/工作流 E2E**（docs/20）：平台用户 CRUD/登录/禁用/重置/删除；SSO Provider 创建/列表不泄露 secret/启停/不可达 issuer test 失败/公开列表只含 enabled/删除；双租户同用户名+密码账号 → 无 tenantCode 登录返回 `tenantSelectionRequired`（2 项）→ 带 tenantCode 登录 → `/api/auth/tenants` 可切换列表 → `/api/auth/switch-tenant` 换发 JWT；`/api/workflows/tenant-lifecycle` 状态/活动/Skill 映射/迁移；清理 |
+| `e2e-v11.ps1` | **v11 平台审计中心 E2E**（docs/21）：admin 建两租户并触发审计动作 → `GET /api/platform/audits` 跨租户记录（含 tenantCode/tenantName）→ tenantId/action/keyword 过滤 → 分页 total 与 at DESC 排序 → 租户管理员/AUDITOR 403、未认证 401 → `GET /api/platform/audits/export?format=csv` text/csv attachment + 内容含租户 code/动作 + tenantId 过滤 → `PLATFORM_AUDIT_EXPORTED` 审计 → 清理 |
 | `mcp-smoke.ps1` | v1 MCP 协议冒烟：`initialize` / `notifications/initialized` / `ping` / `tools/list`（14 工具）/ `tools/call` / 未知方法 `-32601` / `GET /mcp/info` |
 | `mcp-smoke-v2.ps1` | **v2 MCP 冒烟**：`tools/list` 数量（14 基础工具 + 8 个 v2 工具 = 22）+ `org.tree` / `account.list` / `rating.list` 调用断言 |
 | `README.md` | 本文件 |
@@ -60,6 +61,8 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
     有 60s 缓存，脚本在禁用后会轮询公开列表直至缓存过期（最长 75s）；`/api/auth/tenants` 的可切换候选按
     `password_hash` 匹配（含随机盐），同密码但独立创建的账号可能不被列出，该条按实测降级 SKIP 并在
     detail 注明契约缺口。
+15. `e2e-v11.ps1` 依赖 `docs/21` 的平台审计中心（`GET /api/platform/audits`、`.../export?format=csv`）：
+    **接口缺失（404/405/500/501）时整体 SKIP**；租户管理员/AUDITOR 访问平台审计应为 403，未认证 401。
 
 ## 执行
 
@@ -98,6 +101,9 @@ pwsh ./tests/e2e-v8.ps1 -BaseUrl http://localhost:18080
 # v10 平台用户/SSO/多租户/工作流 E2E
 pwsh ./tests/e2e-v10.ps1 -BaseUrl http://localhost:18080
 
+# v11 平台审计中心 E2E（跨租户查询/过滤/分页/CSV/权限）
+pwsh ./tests/e2e-v11.ps1 -BaseUrl http://localhost:18080
+
 # 指定 k8s 端口
 powershell -File ./tests/e2e-v2.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v3.ps1 -BaseUrl http://localhost:30080
@@ -109,6 +115,7 @@ powershell -File ./tests/e2e-v6b.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v7.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v8.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v10.ps1 -BaseUrl http://localhost:30080
+powershell -File ./tests/e2e-v11.ps1 -BaseUrl http://localhost:30080
 
 # MCP 协议冒烟
 pwsh ./tests/mcp-smoke.ps1 -BaseUrl http://localhost:18080 -ApiKey dev-mcp-key
@@ -120,8 +127,8 @@ pwsh ./scripts/verify.ps1
 pwsh ./scripts/verify.ps1 -TenantServiceUrl http://localhost:8081
 ```
 
-建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `e2e-v8.ps1` → `e2e-v10.ps1` → `scripts/verify.ps1`。
-`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7/v8/v10 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
+建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `e2e-v8.ps1` → `e2e-v10.ps1` → `e2e-v11.ps1` → `scripts/verify.ps1`。
+`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7/v8/v10/v11 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
 
 ## 版本能力门（v2 rollout 期间的关键行为）
 
@@ -244,6 +251,18 @@ API（租户审计/平台审计）则该条为 SKIP。
 已知契约缺口：`/api/auth/tenants` 的候选按 `password_hash`（含随机盐）匹配，两个租户分别用相同明文密码创建
 账号时盐不同，候选可能只返回当前租户；脚本在「无其它租户」时将该条降级为 SKIP 并在 detail 记录，
 `switch-tenant` 仍单独断言（当前后端可成功换发 JWT）。
+
+### v11 平台审计中心能力门
+
+`e2e-v11.ps1` 登录后、创建数据前探测 `GET /api/platform/audits?page=0&size=1`（admin JWT）：
+
+- 200 且 `data` 为 PageResult（含 `items/total`）→ 继续全部审计断言；
+- 404/405/500/501 → `[SKIP] v11 api availability - ... (v11 audit center not deployed)`，其余 21 条断言
+  全部 `SKIP`，退出码 0；
+- 其他状态（如 admin 403）→ FAIL，便于发现权限/网关代理问题。
+
+`scripts/verify.ps1` 的 `Test-V11Available` 复用同一探测，输出 `E2E v11 audit - SKIP <缺失标记>` 或
+`E2E v11 audit - PASS cross-tenant audits + filters/pagination + CSV export + permissions`。
 
 ## 断言与退出码
 
@@ -495,6 +514,22 @@ API（租户审计/平台审计）则该条为 SKIP。
 | 工作流 | workflow structure / activities map skills | states≥8、transitions>0；activities 均映射 skillId |
 | 清理 | tenant cleanup | 软删两个租户 |
 
+### e2e-v11.ps1 断言清单（24 条，docs/21）
+
+| 分组 | 断言 | 说明 |
+|---|---|---|
+| 前置 | preflight gateway / login admin / v11 api availability | `/api/platform/audits` 探测（PageResult） |
+| 数据 | tenant A create / update / org create / account create / activation | 触发 `CREATED` / `UPDATED` / `ORG_CREATED` / `ACCOUNT_CREATED` / `SUBMITTED` 审计 |
+| 权限准备 | tenant admin login / tenant B create | 租户管理员 JWT；第二租户用于跨租户记录 |
+| 查询 | platform audits cross tenant | 返回含 tenantId/tenantCode/tenantName/at/actor/action/detail，A/B 两租户均有记录 |
+| 过滤 | filter tenantId / filter action / filter keyword | 按租户 id、动作（CREATED）、关键字（租户 code）过滤均生效 |
+| 分页 | pagination page size / pagination total | size=2 时每页 ≤2 且 total 稳定；page0/page1 不重叠 |
+| 排序 | sorting at desc | `at` 倒序 |
+| 权限 | tenant admin 403 / auditor 403 / unauthenticated 401 | 平台审计仅 PLATFORM_ADMIN |
+| CSV | csv export structure / csv export filter | `text/csv` + attachment；内容含租户 code 与动作；tenantId 过滤后不含另一租户 |
+| 审计 | platform audit exported | 导出自身写 `PLATFORM_AUDIT_EXPORTED` 并可查 |
+| 清理 | tenant cleanup | 软删两个租户 |
+
 ## 预期输出示例
 
 旧环境（无 v2 接口）：
@@ -711,6 +746,33 @@ PASS=2  FAIL=0  SKIP=32
 result: PASS
 ```
 
+v11 平台审计环境：
+
+```
+[PASS] v11 api availability - HTTP 200 total=...
+[PASS] platform audits cross tenant - total=... tenantA=... tenantB=... tenantName=...
+[PASS] filter tenantId - items=... all for tenantA
+[PASS] filter action - items=... action=CREATED
+[PASS] pagination page size - page0=2 page1=2 total=...
+[PASS] sorting at desc - items=...
+[PASS] platform audits tenant admin 403 - HTTP 403
+[PASS] csv export structure - HTTP 200 contentType=text/csv attachment=true
+[PASS] platform audit exported - items=1
+PASS=24  FAIL=0  SKIP=0
+result: PASS
+```
+
+旧环境（无 v11 API）：
+
+```
+[PASS] preflight gateway
+[PASS] login admin
+[SKIP] v11 api availability - GET /api/platform/audits -> HTTP 500 (v11 audit center not deployed)
+[SKIP] ... (其余 21 条)
+PASS=2  FAIL=0  SKIP=22
+result: PASS
+```
+
 ## 常见问题
 
 | 现象 | 处理 |
@@ -792,3 +854,11 @@ result: PASS
 | `auth tenants list contains other` SKIP | 候选按 `password_hash`（含随机盐）匹配，独立创建的账号盐不同；若要求按明文密码匹配需后端调整 |
 | `switch tenant` FAIL | `/api/auth/switch-tenant` 未换发 JWT：检查当前账号凭据校验与目标租户同 username 账号 |
 | `workflow structure` FAIL | `states<8` 或 `transitions=0`：检查 `TenantLifecycleWorkflowCatalog` 是否由状态机/技能聚合 |
+| `v11 api availability` SKIP（404/500） | tenant-service v11 未部署平台审计：确认 `GET /api/platform/audits` 与 `/export` 可用，且网关代理 `/api/platform/audits/**` |
+| `v11 api availability` FAIL（admin 403） | 权限拦截未放行平台管理员：检查 `@RequirePermission("audit:read")` 与平台受众校验/种子权限 |
+| `platform audits cross tenant` FAIL（缺 tenantCode/tenantName） | 聚合 SQL 未 join tenants：结果需带 `tenantId/tenantCode/tenantName` |
+| `filter tenantId/action/keyword` FAIL | 过滤参数未生效或关键字未覆盖 tenantCode/name/detail；检查查询条件与 LIKE 绑定 |
+| `sorting at desc` FAIL | 排序不是 `at DESC`：检查 `ORDER BY at DESC` 与分页稳定性 |
+| `csv export structure` FAIL | 导出未返回 `text/csv` + `Content-Disposition: attachment`；检查转义与 ≤10000 行限制 |
+| `platform audit exported` FAIL | 导出未写审计 `PLATFORM_AUDIT_EXPORTED`（不含明细） |
+| `platform audits tenant admin 403`/`auditor 403` FAIL（200） | 平台审计未限制为 PLATFORM_ADMIN：租户管理员/审计员只能走租户级接口 |
