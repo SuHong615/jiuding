@@ -104,7 +104,7 @@ jiuding/
 | 文档 | 说明 |
 |---|---|
 | [产品指引](docs/PRODUCT_GUIDE.md) | 定位、非生产级声明、流程、配置、路线图 |
-| [法律与合规](docs/LEGAL.md) | 许可证、商标、专利、隐私、导出与分发义务自查 |
+| [发布说明 v1](docs/22-release-notes-v1.md) | 功能范围、验证数据、已知边界、升级注意 |\n| [法律与合规](docs/LEGAL.md) | 许可证、商标、专利、隐私、导出与分发义务自查 |
 | [GitHub 开源提交指引](docs/OPEN_SOURCE_GUIDE.md) | 许可证合规、仓库配置、CI、Release 清单 |
 | [仓库结构](docs/REPO_STRUCTURE.md) | 目录规范、命名、重构记录 |
 | [架构设计](docs/01-architecture.md) | 上下文/组件/状态机/部署/ADR |
