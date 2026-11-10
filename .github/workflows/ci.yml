@@ -55,7 +55,8 @@ jobs:
               echo "missing header: $f"
               missing=1
             fi
-          done < <(git ls-files '*.java' '*.ts' '*.tsx' '*.css' '*.sql' '*.sh' '*.ps1' '*.yml' '*.yaml' | grep -v '^\\.github/')
+          # Exempt pre-header Flyway migrations to preserve checksums on existing databases.
+          done < <(git ls-files '*.java' '*.ts' '*.tsx' '*.css' '*.sql' '*.sh' '*.ps1' '*.yml' '*.yaml' | grep -v '^\.github/' | grep -v -E 'V8__quota|V9__platform_identity|V10__account_password_fingerprint|V11__tenant_rls|V11_1__tenant_rls')
           exit $missing
 
   secret-scan:
