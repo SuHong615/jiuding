@@ -521,6 +521,48 @@ function Test-V11Available {
     }
 }
 
+function Test-V12Available {
+    param([string]$Url, [string]$Token)
+    $mockStatus = 0
+    $mockOk = $false
+    try {
+        $mockResponse = Invoke-WebRequest -Uri "$Url/mock-oidc/.well-known/openid-configuration" -UseBasicParsing -TimeoutSec 10
+        $mockStatus = [int]$mockResponse.StatusCode
+        $mockPayload = $mockResponse.Content | ConvertFrom-Json
+        $mockOk = ($null -ne $mockPayload) -and ($mockPayload.PSObject.Properties.Name -contains 'authorization_endpoint')
+    }
+    catch {
+        $response = $_.Exception.Response
+        if ($response) { $mockStatus = [int]$response.StatusCode }
+    }
+    $workflowStatus = 0
+    $workflowOk = $false
+    $usersOk = $false
+    if (-not [string]::IsNullOrWhiteSpace($Token)) {
+        $headers = @{ Authorization = ("Bearer {0}" -f $Token) }
+        try {
+            $workflowResponse = Invoke-WebRequest -Uri "$Url/api/approval-workflows" -Headers $headers -UseBasicParsing -TimeoutSec 10
+            $workflowStatus = [int]$workflowResponse.StatusCode
+            $workflowPayload = $workflowResponse.Content | ConvertFrom-Json
+            $workflowOk = ($null -ne $workflowPayload) -and -not (($workflowPayload.PSObject.Properties.Name -contains 'code') -and [int]$workflowPayload.code -ne 0)
+        }
+        catch {
+            $response = $_.Exception.Response
+            if ($response) { $workflowStatus = [int]$response.StatusCode }
+        }
+        try {
+            $usersResponse = Invoke-WebRequest -Uri "$Url/api/platform/users" -Headers $headers -UseBasicParsing -TimeoutSec 10
+            $usersPayload = $usersResponse.Content | ConvertFrom-Json
+            $usersOk = ($null -ne $usersPayload) -and -not (($usersPayload.PSObject.Properties.Name -contains 'code') -and [int]$usersPayload.code -ne 0)
+        }
+        catch { $usersOk = $false }
+    }
+    if ($mockOk -or $workflowOk -or $usersOk) {
+        return [pscustomobject]@{ Available = $true; Detail = ('mockOidc HTTP ' + $mockStatus + '; workflows HTTP ' + $workflowStatus + '; platform users=' + $usersOk) }
+    }
+    return [pscustomobject]@{ Available = $false; Detail = ('v12 API not deployed; mockOidc HTTP ' + $mockStatus + '; workflows HTTP ' + $workflowStatus) }
+}
+
 # ---------------------------------------------------------------- static checks
 Write-Host '==> static checks' -ForegroundColor Cyan
 $composeFile = Join-Path $root 'deploy\docker-compose.yml'
@@ -560,7 +602,7 @@ if ($missingScripts.Count -eq 0) { Add-Result 'scripts' 'PASS' "$($requiredScrip
 else { Add-Result 'scripts' 'FAIL' ("missing: " + ($missingScripts -join ', ')) }
 
 $testsDir = Join-Path $root 'tests'
-$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-v7.ps1', 'e2e-v8.ps1', 'e2e-v10.ps1', 'e2e-v11.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
+$requiredTests = @('e2e.ps1', 'mcp-smoke.ps1', 'e2e-v2.ps1', 'e2e-v3.ps1', 'e2e-v4.ps1', 'e2e-v5.ps1', 'e2e-v6.ps1', 'e2e-v6b.ps1', 'e2e-v7.ps1', 'e2e-v8.ps1', 'e2e-v10.ps1', 'e2e-v11.ps1', 'e2e-v12.ps1', 'e2e-skill.ps1', 'mcp-smoke-v2.ps1', 'README.md')
 $missingTests = @()
 foreach ($test in $requiredTests) {
     if (-not (Test-Path (Join-Path $testsDir $test))) { $missingTests += $test }
@@ -605,6 +647,7 @@ else {
         Add-Result 'E2E v8 export' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v10 chain' 'SKIP' 'gateway not ready'
         Add-Result 'E2E v11 audit' 'SKIP' 'gateway not ready'
+        Add-Result 'E2E v12 chain' 'SKIP' 'gateway not ready'
     }
     else {
         Add-Result 'gateway health' 'PASS' $BaseUrl
@@ -848,6 +891,25 @@ else {
         }
         else {
             Add-Result 'E2E v11 audit' 'SKIP' '-SkipE2E'
+        }
+
+        # ------------------------------------------------ v12 mock OIDC / workflow definitions / RLS checks
+        if (-not $SkipE2E) {
+            $v12 = Test-V12Available -Url $BaseUrl -Token $adminProbeToken
+            $e2eV12Script = Join-Path $testsDir 'e2e-v12.ps1'
+            if ($v12.Available -and (Test-Path $e2eV12Script)) {
+                Write-Host ''
+                Write-Host '==> tests/e2e-v12.ps1' -ForegroundColor Cyan
+                & $e2eV12Script -BaseUrl $BaseUrl -TimeoutSeconds $TimeoutSeconds
+                if ($LASTEXITCODE -eq 0) { Add-Result 'E2E v12 chain' 'PASS' 'mock OIDC SSO + workflow definitions/publish + RLS isolation + bootstrap' }
+                else { Add-Result 'E2E v12 chain' 'FAIL' "exit $LASTEXITCODE" }
+            }
+            else {
+                Add-Result 'E2E v12 chain' 'SKIP' $v12.Detail
+            }
+        }
+        else {
+            Add-Result 'E2E v12 chain' 'SKIP' '-SkipE2E'
         }
     }
 }

@@ -21,6 +21,7 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
 | `e2e-v8.ps1` | **v8 导出/离户 E2E**（docs/18）：数据准备（组织/账号/评级/审计）→ `export?mask=true` 结构与 PII 掩码 + `Content-Disposition` → 默认 mask、TENANT_ADMIN 只读掩码、admin `mask=false` 明文、非平台 403 → MEMBER/ORG_ADMIN 403 → `TENANT_EXPORTED` 审计 → 离户（reason 必填、仅平台管理员、ACTIVE/SUSPENDED、TERMINATED+deletedAt）→ 离户后 detail/export 404、重复离户 404/409、`TENANT_OFFBOARDED` 审计探测 → 清理 |
 | `e2e-v10.ps1` | **v10 平台身份/SSO/多租户/工作流 E2E**（docs/20）：平台用户 CRUD/登录/禁用/重置/删除；SSO Provider 创建/列表不泄露 secret/启停/不可达 issuer test 失败/公开列表只含 enabled/删除；双租户同用户名+密码账号 → 无 tenantCode 登录返回 `tenantSelectionRequired`（2 项）→ 带 tenantCode 登录 → `/api/auth/tenants` 可切换列表 → `/api/auth/switch-tenant` 换发 JWT；`/api/workflows/tenant-lifecycle` 状态/活动/Skill 映射/迁移；清理 |
 | `e2e-v11.ps1` | **v11 平台审计中心 E2E**（docs/21）：admin 建两租户并触发审计动作 → `GET /api/platform/audits` 跨租户记录（含 tenantCode/tenantName）→ tenantId/action/keyword 过滤 → 分页 total 与 at DESC 排序 → 租户管理员/AUDITOR 403、未认证 401 → `GET /api/platform/audits/export?format=csv` text/csv attachment + 内容含租户 code/动作 + tenantId 过滤 → `PLATFORM_AUDIT_EXPORTED` 审计 → 清理 |
+| `e2e-v12.ps1` | **v12 生产化 E2E**（docs/23）：Mock OIDC discovery 与 SSO 端到端（provider→authorize 302→code→callback JWT→`/api/auth/me`，端到端不可用则 SKIP 并注明）；工作流定义 CRUD/validate/publish → 带 `workflowCode` 创建审批 → `PENDING_APPROVAL` → 清理；RLS/逻辑隔离（租户 B 读租户 A 组织/账号 403、X-Tenant-Id 伪造 403、平台管理员可跨租户只读）；平台 bootstrap 用户（含 PLATFORM_ADMIN）；清理 |
 | `mcp-smoke.ps1` | v1 MCP 协议冒烟：`initialize` / `notifications/initialized` / `ping` / `tools/list`（14 工具）/ `tools/call` / 未知方法 `-32601` / `GET /mcp/info` |
 | `mcp-smoke-v2.ps1` | **v2 MCP 冒烟**：`tools/list` 数量（14 基础工具 + 8 个 v2 工具 = 22）+ `org.tree` / `account.list` / `rating.list` 调用断言 |
 | `README.md` | 本文件 |
@@ -63,6 +64,11 @@ Docker 模式传 `-BaseUrl http://localhost:8080`，k8s NodePort/Port-Forward �
     detail 注明契约缺口。
 15. `e2e-v11.ps1` 依赖 `docs/21` 的平台审计中心（`GET /api/platform/audits`、`.../export?format=csv`）：
     **接口缺失（404/405/500/501）时整体 SKIP**；租户管理员/AUDITOR 访问平台审计应为 403，未认证 401。
+16. `e2e-v12.ps1` 依赖 `docs/23` 的 v12 生产化能力：`/mock-oidc/**`（dev-only Mock IdP）、
+    `/api/approval-workflows`（工作流定义 CRUD/validate/publish）与平台 bootstrap 用户。
+    Mock OIDC 的 provider issuer 需为网关自身可达地址：k8s 默认 `http://gateway:8080/mock-oidc`（可用
+    `-GatewayInternalUrl` 覆盖）；若 authorize/callback 端到端不可用，脚本只断言 discovery 并将
+    authorize/callback/me 降级 SKIP 并注明；工作流 API 不可达时整段 SKIP（docs/23 注网关路由仍在发布）。
 
 ## 执行
 

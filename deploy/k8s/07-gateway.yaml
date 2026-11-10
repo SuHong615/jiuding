@@ -74,6 +74,7 @@ metadata:
   namespace: tenancy-center
 spec:
   type: NodePort
+  sessionAffinity: ClientIP
   selector: { app: gateway }
   ports:
     - port: 8080

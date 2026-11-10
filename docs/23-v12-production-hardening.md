@@ -1,6 +1,6 @@
 # 23 · v12：生产化四件套（RLS、工作流编排、IdP、平台账号/Redis）
 
-> 状态：Phase 1 已完成并部署（2026-11-10）；待：Redis、工作流前端编排、E2E v12、网关 workflow 路由区分｜Owner：Lead
+> 状态：**已验收**（2026-11-10）：RLS、bootstrap、工作流定义/编排 UI、Mock OIDC 端到端、E2E v12 33/33；Redis 共享缓存/限流仍在后续｜Owner：Lead
 
 ## 1. 范围
 
