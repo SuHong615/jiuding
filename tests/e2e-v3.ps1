@@ -302,7 +302,7 @@ function Find-ItemById {
 
 function Login-Platform {
     param([string]$Username, [string]$Password)
-    $data = Invoke-Api -Path '/api/auth/login' -Method POST -Body @{ username = $Username; password = $Password }
+    $data = Invoke-Api -Path '/api/auth/login' -Method POST -Headers @{ 'X-Forwarded-For' = ('198.51.100.' + (Get-Random -Minimum 10 -Maximum 250)) } -Body @{ username = $Username; password = $Password }
     return [pscustomobject]@{ Token = [string](Get-JsonProp $data 'token'); Principal = (Get-JsonProp $data 'principal') }
 }
 

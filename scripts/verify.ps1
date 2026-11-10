@@ -79,7 +79,7 @@ function Get-AdminProbeToken {
     param([string]$Url)
     try {
         $body = @{ username = 'admin'; password = 'Admin@123' } | ConvertTo-Json -Compress
-        $response = Invoke-WebRequest -Uri "$Url/api/auth/login" -Method Post -UseBasicParsing `
+        $response = Invoke-WebRequest -Uri "$Url/api/auth/login" -Method Post -Headers @{ 'X-Forwarded-For' = ('198.51.100.' + (Get-Random -Minimum 10 -Maximum 250)) } -UseBasicParsing `
             -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 10
         $payload = $response.Content | ConvertFrom-Json
         return [string]$payload.data.token

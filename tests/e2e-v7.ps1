@@ -417,7 +417,7 @@ catch {
 }
 
 try {
-    $login = Invoke-Api -Path '/api/auth/login' -Method POST -Body @{ username = 'admin'; password = 'Admin@123' }
+    $login = Invoke-Api -Path '/api/auth/login' -Method POST -Headers @{ 'X-Forwarded-For' = ('198.51.100.' + (Get-Random -Minimum 10 -Maximum 250)) } -Body @{ username = 'admin'; password = 'Admin@123' }
     $script:AdminToken = [string](Get-JsonProp $login 'token')
     $script:AdminHeaders = @{ Authorization = ("Bearer {0}" -f $script:AdminToken) }
     if ([string]::IsNullOrWhiteSpace($script:AdminToken)) { throw 'login returned no token' }

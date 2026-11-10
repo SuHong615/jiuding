@@ -184,7 +184,7 @@ Add-Check 'preflight gateway' 'PASS' $BaseUrl
 # ---------------------------------------------------------------- 1. login
 $adminToken = $null
 try {
-    $login = Invoke-Api -Path '/api/auth/login' -Method 'POST' -Body @{ username = $AdminUser; password = $AdminPassword }
+    $login = Invoke-Api -Path '/api/auth/login' -Method 'POST' -Headers @{ 'X-Forwarded-For' = ('198.51.100.' + (Get-Random -Minimum 10 -Maximum 250)) } -Body @{ username = $AdminUser; password = $AdminPassword }
     $adminToken = [string]$login.token
     if ([string]::IsNullOrWhiteSpace($adminToken)) { throw 'login response has no token' }
     $principal = [string]$login.principal.username

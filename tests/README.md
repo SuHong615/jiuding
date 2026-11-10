@@ -110,6 +110,9 @@ pwsh ./tests/e2e-v10.ps1 -BaseUrl http://localhost:18080
 # v11 平台审计中心 E2E（跨租户查询/过滤/分页/CSV/权限）
 pwsh ./tests/e2e-v11.ps1 -BaseUrl http://localhost:18080
 
+# v12 Mock OIDC/工作流定义/RLS/平台 bootstrap E2E
+pwsh ./tests/e2e-v12.ps1 -BaseUrl http://localhost:18080
+
 # 指定 k8s 端口
 powershell -File ./tests/e2e-v2.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v3.ps1 -BaseUrl http://localhost:30080
@@ -122,6 +125,7 @@ powershell -File ./tests/e2e-v7.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v8.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v10.ps1 -BaseUrl http://localhost:30080
 powershell -File ./tests/e2e-v11.ps1 -BaseUrl http://localhost:30080
+powershell -File ./tests/e2e-v12.ps1 -BaseUrl http://localhost:30080
 
 # MCP 协议冒烟
 pwsh ./tests/mcp-smoke.ps1 -BaseUrl http://localhost:18080 -ApiKey dev-mcp-key
@@ -133,8 +137,8 @@ pwsh ./scripts/verify.ps1
 pwsh ./scripts/verify.ps1 -TenantServiceUrl http://localhost:8081
 ```
 
-建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `e2e-v8.ps1` → `e2e-v10.ps1` → `e2e-v11.ps1` → `scripts/verify.ps1`。
-`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7/v8/v10/v11 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
+建议执行顺序：`e2e.ps1` → `mcp-smoke.ps1` → `e2e-v2.ps1` → `mcp-smoke-v2.ps1` → `e2e-v3.ps1` → `e2e-v4.ps1` → `e2e-v5.ps1` → `e2e-skill.ps1` → `e2e-v6.ps1` → `e2e-v6b.ps1` → `e2e-v7.ps1` → `e2e-v8.ps1` → `e2e-v10.ps1` → `e2e-v11.ps1` → `e2e-v12.ps1` → `scripts/verify.ps1`。
+`verify.ps1` 会自动探测 v2/v3/v5/v5.1/v6/v6B/v7/v8/v10/v11/v12 能力：可用则追加对应脚本，不可用则 `SKIP` 并打印缺失接口/标记。
 
 ## 版本能力门（v2 rollout 期间的关键行为）
 
@@ -269,6 +273,19 @@ API（租户审计/平台审计）则该条为 SKIP。
 
 `scripts/verify.ps1` 的 `Test-V11Available` 复用同一探测，输出 `E2E v11 audit - SKIP <缺失标记>` 或
 `E2E v11 audit - PASS cross-tenant audits + filters/pagination + CSV export + permissions`。
+
+### v12 Mock OIDC/工作流/RLS 能力门
+
+`e2e-v12.ps1` 登录后、创建数据前探测三项（任一存在即继续，否则整体 SKIP）：
+
+1. `GET /mock-oidc/.well-known/openid-configuration`（无认证）→ 200 且含 `authorization_endpoint`；
+2. `GET /api/approval-workflows`（admin JWT）→ 200；
+3. `GET /api/platform/users`（admin JWT）→ 200。
+
+分块降级：工作流 API 不可达时仅 workflow 段（8 条）SKIP；Mock OIDC 端到端在 authorize/callback 不可用时
+仅 callback/me 降级 SKIP 并注明错误码（discovery 与 authorize 302 仍断言）。
+`scripts/verify.ps1` 的 `Test-V12Available` 复用同一探测，输出 `E2E v12 chain - SKIP <缺失标记>` 或
+`E2E v12 chain - PASS mock OIDC SSO + workflow definitions/publish + RLS isolation + bootstrap`。
 
 ## 断言与退出码
 
@@ -536,6 +553,22 @@ API（租户审计/平台审计）则该条为 SKIP。
 | 审计 | platform audit exported | 导出自身写 `PLATFORM_AUDIT_EXPORTED` 并可查 |
 | 清理 | tenant cleanup | 软删两个租户 |
 
+### e2e-v12.ps1 断言清单（33 条，docs/23）
+
+| 分组 | 断言 | 说明 |
+|---|---|---|
+| 前置 | preflight gateway / login admin / v12 api availability | Mock OIDC / 工作流 / 平台用户探测 |
+| Bootstrap | platform bootstrap users | `GET /api/platform/users` 非空且含 PLATFORM_ADMIN |
+| 隔离准备 | tenant A/B create+activation、org A/B、account B、tenant B login | 两个 ACTIVE 租户 + B 租户账号 |
+| RLS/隔离 | cross tenant org 403 / accounts 403 / header 403 / admin cross tenant read | B 账号读 A 组织/账号 → 403；伪造 `X-Tenant-Id` → 403；平台管理员可读两租户 |
+| 工作流 | workflow api availability / list / create / validate / publish | 定义（AUTO_CHECK risk-review → HUMAN slaHours=2）CRUD、环检测校验、发布 |
+| 工作流 | approval with workflowCode / approval pending state | 带 `workflowCode` 建审批 → `PENDING_APPROVAL` |
+| 工作流 | workflow cleanup | 删除 DRAFT；PUBLISHED 保留（无删除接口，detail 注明） |
+| Mock OIDC | mock oidc discovery | discovery 含 issuer/authorization/token/userinfo |
+| Mock OIDC | sso provider create / public list / authorize url | 配置 enabled provider（issuer=网关 mock）并等待网关缓存 |
+| Mock OIDC | oidc mock authorize redirect / callback jwt / oidc me | authorize 302→code→callback 302→JWT→`/api/auth/me`；不可端到端时 SKIP 并注明 |
+| 清理 | sso provider cleanup / tenant cleanup | 删除 Provider、软删两租户 |
+
 ## 预期输出示例
 
 旧环境（无 v2 接口）：
@@ -779,6 +812,36 @@ PASS=2  FAIL=0  SKIP=22
 result: PASS
 ```
 
+v12 Mock OIDC/工作流/RLS 环境：
+
+```
+[PASS] v12 api availability - mockOidc=True workflows=True platformUsers=True
+[PASS] platform bootstrap users - users=1 usernames=...
+[PASS] cross tenant org 403 - HTTP 403 code=40300
+[PASS] cross tenant header 403 - HTTP 403 (X-Tenant-Id mismatch rejected)
+[PASS] workflow create - id=... code=e2e-v12-wf-... status=DRAFT
+[PASS] workflow validate - valid=true nodeCount=2
+[PASS] workflow publish - publishedAt=...
+[PASS] approval pending state - state=PENDING_APPROVAL for published workflow (AUTO_CHECK -> HUMAN)
+[PASS] mock oidc discovery - issuer=http://localhost:30080/mock-oidc
+[PASS] oidc mock authorize redirect - HTTP 302 code returned
+[PASS] oidc callback jwt - callback returned 302 with JWT fragment
+[PASS] oidc me - username=Mock User roles=TENANT_ADMIN
+PASS=33  FAIL=0  SKIP=0
+result: PASS
+```
+
+旧环境（无 v12 API）：
+
+```
+[PASS] preflight gateway
+[PASS] login admin
+[SKIP] v12 api availability - v12 API not deployed; mockOidc HTTP 500; workflows HTTP 500
+[SKIP] ... (其余 30 条)
+PASS=2  FAIL=0  SKIP=31
+result: PASS
+```
+
 ## 常见问题
 
 | 现象 | 处理 |
@@ -868,3 +931,12 @@ result: PASS
 | `csv export structure` FAIL | 导出未返回 `text/csv` + `Content-Disposition: attachment`；检查转义与 ≤10000 行限制 |
 | `platform audit exported` FAIL | 导出未写审计 `PLATFORM_AUDIT_EXPORTED`（不含明细） |
 | `platform audits tenant admin 403`/`auditor 403` FAIL（200） | 平台审计未限制为 PLATFORM_ADMIN：租户管理员/审计员只能走租户级接口 |
+| `v12 api availability` SKIP（mock/workflows/users 全失败） | 部署未含 v12：确认 `/mock-oidc/**`、`/api/approval-workflows`、`/api/platform/users` 至少一个可用 |
+| `mock oidc discovery` FAIL | gateway 未开启 `TENANCY_MOCK_OIDC_ENABLED=true` 或 `/mock-oidc/**` 未加入白名单 |
+| `oidc mock authorize redirect`/`oidc callback jwt` SKIP | provider issuer 对网关不可达（k8s 用 `http://gateway:8080/mock-oidc`，或 `-GatewayInternalUrl` 覆盖）→ 端到端 SSO 跳过并注明 |
+| `oidc callback jwt` SKIP（error=oidc_token_failed） | 网关 token 交换失败：检查 mock issuer 的 discovery/token endpoint 从网关 pod 可达、PKCE/redirect_uri 一致 |
+| `workflow api availability` SKIP（500） | 网关未代理 `/api/approval-workflows` 或 approval-service V2 迁移缺失；docs/23 注网关 workflow 路由仍在发布 |
+| `workflow validate` FAIL | 定义缺节点/环：确认 `nodes` 含 AUTO_CHECK/HUMAN 且 `next` 连通 |
+| `approval pending state` FAIL | 发布定义未生效或引擎仍走默认流程：检查 `workflowCode` 解析与 APPROVER 人工节点 |
+| `cross tenant org 403`/`accounts 403` FAIL（200） | 租户隔离缺失：检查 `SecurityScope` 同租户校验与 RLS GUC（Postgres） |
+| `cross tenant header 403` FAIL | 伪造 `X-Tenant-Id` 未被拒绝：检查 AuthFilter 租户头与 JWT tid 校验 |
