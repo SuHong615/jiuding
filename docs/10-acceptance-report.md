@@ -211,6 +211,12 @@
 - **Mock OIDC 端到端**：gateway dev-only `/mock-oidc/*`（discovery/authorize/token PKCE/userinfo），`/mock-oidc/.well-known/openid-configuration` 部署后 200；`TENANCY_PRESET_FALLBACK_ENABLED` 开关默认 false。
 - 测试：tenant 266 / approval 71 / gateway 93 全绿；全量 653 BUILD SUCCESS；部署 smoke 全 200。
 - 待完成：Redis 共享缓存/限流、工作流前端编排 UI、E2E v12、网关 `/api/workflows` 与审批定义 API 路由区分。
+## 4.21 v13 Redis 共享缓存/限流实测（2026-11-10）
+
+- Redis 7 部署（compose/k8s，maxmemory 256mb allkeys-lru，healthcheck），gateway/tenant-service 注入 REDIS_URL/REDIS_HOST/PORT 与 TENANCY_REDIS_ENABLED。
+- gateway：登录限流与租户 API RPM 改为 Redis ZSET 滑动窗口（key `tenancy:rl:login:*`/`quota:*`），Redis 异常按请求降级内存；111 tests 全绿。
+- tenant-service：PermissionCache 可选 Redis（`rbac:perm:{role}` TTL 60s），未命中查 DB 回写，evict 清 Redis，异常降级内存。
+- E2E/verify：全量 `scripts/verify.ps1` **22/22 PASS**（8 services 含 redis），v12 33/33，租户/工作流/审计/MCP 全绿。
 ## 5. 架构审查与最佳实践落实（docs/11、docs/13）
 
 | 主题 | 决策 |
@@ -257,13 +263,13 @@ sh deploy/k8s/prod/apply-prod.sh
 sh deploy/k8s/zero-downtime-check.sh 90
 ```
 
-## 8. 交付规模（v12 Phase 1）
+## 8. 交付规模（v13）
 
 - 后端 Java：340+ 文件；前端 65+ TS/TSX 文件
 - 技能：5 内置 + 上传/审核/版本/调试/启停；MCP 工具 22；RBAC 43 权限/5 内置角色
 - 安全：OIDC/SSO、MFA、SCIM 2.0、账号安全、登录限流、K8s 随机 Secret、secret-scan CI
 - 配额：席位/组织强制、用量 API、网关 API RPM 限流；备份/恢复脚本
 - 文档：18 份（新增 docs/17 配额/备份）
-- 测试：653 自动化测试 + 31 v2 + 42 v3 + 20 v4 + 46 v5 + 13 技能 + 25 v6 + 31 v6B + 23 v7 + 27 v8 + 15 MCP 断言
+- 测试：671 自动化测试 + 31 v2 + 42 v3 + 20 v4 + 46 v5 + 13 技能 + 25 v6 + 31 v6B + 23 v7 + 27 v8 + 15 MCP 断言
 - 生产化：2 副本 + PDB ×6 + HPA ×2 + CronJob ×2；零中断验证通过
 - UI 截图：`docs/assets/ui-login-v3.png`、`ui-tenants.png`、`ui-org.png`

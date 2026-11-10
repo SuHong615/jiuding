@@ -1,6 +1,6 @@
 # 23 · v12：生产化四件套（RLS、工作流编排、IdP、平台账号/Redis）
 
-> 状态：**已验收**（2026-11-10）：RLS、bootstrap、工作流定义/编排 UI、Mock OIDC 端到端、E2E v12 33/33；Redis 共享缓存/限流仍在后续｜Owner：Lead
+> 状态：**已验收**（2026-11-10）：RLS、bootstrap、工作流定义/编排 UI、Mock OIDC 端到端、E2E v12 33/33；Redis 共享缓存/限流已完成（gateway 111 tests、tenant 266、verify 22/22）｜Owner：Lead
 
 ## 1. 范围
 
