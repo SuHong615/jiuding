@@ -110,6 +110,14 @@ Node 版本：>= 18（本机验证 Node 25 / npm 11）。开发环境依赖网�
 - 「导出 CSV」带当前筛选条件下载（文件名为服务端 Content-Disposition，回退 `platform-audits-<date>.csv`）。
 - 平台导航按 `/api/me/permissions` 与平台管理员角色显隐。
 
+## v12 工作流编排
+
+- 工作流页保留生命周期只读视图；新增「流程定义」区（仅平台管理员）：
+  - 列表 code / name / version / status / 更新时间，操作含编辑、校验、发布、删除；
+  - 新建/编辑抽屉：code + name + definition JSON（nodes 支持 id/type AUTO_CHECK|HUMAN|PARALLEL|SLA、skill/role/slaHours/next）+ 节点预览表；
+  - 校验结果弹窗展示 errors/warnings；发布后审批引擎按新版本执行（后端未就绪时保留默认流程）。
+- 调用 `/api/approval-workflows`（列表/CRUD/validate/publish/delete）。
+
 ## 工程约定
 
 - `src/api/client.ts`：统一 fetch 封装，解析 `{code,message,data}`，`code !== 0` 抛 `ApiError`；
