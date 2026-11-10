@@ -19,6 +19,6 @@ package com.suhong.jiuding.approval.workflowdef;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
-/** Body of {@code PUT /api/workflows/{id}} (only DRAFT definitions are editable). */
+/** Body of {@code PUT /api/approval-workflows/{id}} (only DRAFT definitions are editable). */
 public record WorkflowUpdateRequest(String name, JsonNode definition) {
 }

@@ -74,7 +74,7 @@ class WorkflowDefinitionValidationTest {
     void validateDraftWithCycleReportsErrors() throws Exception {
         String id = WorkflowTestSupport.createWorkflowId(
                 mockMvc, jwtService, objectMapper, "validate-cycle", CYCLE_DEF);
-        MvcResult result = mockMvc.perform(post("/api/workflows/{id}/validate", id)
+        MvcResult result = mockMvc.perform(post("/api/approval-workflows/{id}/validate", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.valid").value(false))
@@ -89,12 +89,12 @@ class WorkflowDefinitionValidationTest {
     void publishInvalidDefinitionIsRejected() throws Exception {
         String id = WorkflowTestSupport.createWorkflowId(
                 mockMvc, jwtService, objectMapper, "validate-publish-bad", CYCLE_DEF);
-        mockMvc.perform(post("/api/workflows/{id}/publish", id)
+        mockMvc.perform(post("/api/approval-workflows/{id}/publish", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40001));
 
-        mockMvc.perform(get("/api/workflows/{id}", id)
+        mockMvc.perform(get("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("DRAFT"));
@@ -104,20 +104,20 @@ class WorkflowDefinitionValidationTest {
     void fixingDraftAllowsValidationAndPublish() throws Exception {
         String id = WorkflowTestSupport.createWorkflowId(
                 mockMvc, jwtService, objectMapper, "validate-fix", CYCLE_DEF);
-        mockMvc.perform(put("/api/workflows/{id}", id)
+        mockMvc.perform(put("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "definition", objectMapper.readTree(VALID_DEF)))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/workflows/{id}/validate", id)
+        mockMvc.perform(post("/api/approval-workflows/{id}/validate", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.valid").value(true))
                 .andExpect(jsonPath("$.data.nodeCount").value(2));
 
-        mockMvc.perform(post("/api/workflows/{id}/publish", id)
+        mockMvc.perform(post("/api/approval-workflows/{id}/publish", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
@@ -126,7 +126,7 @@ class WorkflowDefinitionValidationTest {
 
     @Test
     void validateUnknownIdIsNotFound() throws Exception {
-        mockMvc.perform(post("/api/workflows/{id}/validate", "does-not-exist")
+        mockMvc.perform(post("/api/approval-workflows/{id}/validate", "does-not-exist")
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(40400));
@@ -136,7 +136,7 @@ class WorkflowDefinitionValidationTest {
     void validateRequiresPlatformAdmin() throws Exception {
         String id = WorkflowTestSupport.createWorkflowId(
                 mockMvc, jwtService, objectMapper, "validate-forbidden", VALID_DEF);
-        mockMvc.perform(post("/api/workflows/{id}/validate", id)
+        mockMvc.perform(post("/api/approval-workflows/{id}/validate", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.auditor(jwtService)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(40300));

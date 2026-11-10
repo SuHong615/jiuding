@@ -149,4 +149,14 @@ public class ProxyController {
         proxyService.forward(request, response, new ServiceRoute(
                 "tenant-service", properties.getTenantServiceUrl(), properties.getRequestTimeoutMs()));
     }
+
+    /**
+     * v12 approval workflow definitions/runs (docs/23 §3) → approval-service.
+     * Note: {@code /api/workflows/**} (tenant lifecycle view) stays on tenant-service.
+     */
+    @RequestMapping({"/api/approval-workflows", "/api/approval-workflows/**"})
+    public void proxyApprovalWorkflows(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        proxyService.forward(request, response, new ServiceRoute(
+                "approval-service", properties.getApprovalServiceUrl(), properties.getRequestTimeoutMs()));
+    }
 }

@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** CRUD + platform-admin authorisation for {@code /api/workflows} (docs/23 §3). */
+/** CRUD + platform-admin authorisation for {@code /api/approval-workflows} (docs/23 §3). */
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
@@ -79,12 +79,18 @@ class WorkflowDefinitionCrudTest {
         assertThat(data.path("definition").path("nodes")).hasSize(2);
         assertThat(data.path("createdBy").asText()).isEqualTo("admin");
 
+        mockMvc.perform(get("/api/approval-workflows")
+                        .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+
+        // legacy alias kept for the transition period
         mockMvc.perform(get("/api/workflows")
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray());
 
-        mockMvc.perform(get("/api/workflows/{id}", id)
+        mockMvc.perform(get("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(id))
@@ -95,7 +101,7 @@ class WorkflowDefinitionCrudTest {
         update.put("definition", objectMapper.readTree("""
                 {"nodes":[{"id":"only","type":"HUMAN","role":"APPROVER","slaHours":4}]}
                 """));
-        mockMvc.perform(put("/api/workflows/{id}", id)
+        mockMvc.perform(put("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(update)))
@@ -104,12 +110,12 @@ class WorkflowDefinitionCrudTest {
                 .andExpect(jsonPath("$.data.status").value("DRAFT"))
                 .andExpect(jsonPath("$.data.definition.nodes[0].id").value("only"));
 
-        mockMvc.perform(delete("/api/workflows/{id}", id)
+        mockMvc.perform(delete("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.deleted").value(true));
 
-        mockMvc.perform(get("/api/workflows/{id}", id)
+        mockMvc.perform(get("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(40400));
@@ -117,12 +123,12 @@ class WorkflowDefinitionCrudTest {
 
     @Test
     void nonPlatformAdminIsForbidden() throws Exception {
-        mockMvc.perform(get("/api/workflows")
+        mockMvc.perform(get("/api/approval-workflows")
                         .header(WorkflowTestSupport.AUTH, TestSupport.approver(jwtService)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(40300));
 
-        mockMvc.perform(post("/api/workflows")
+        mockMvc.perform(post("/api/approval-workflows")
                         .header(WorkflowTestSupport.AUTH, TestSupport.approver(jwtService))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(WorkflowTestSupport.workflowBody(objectMapper, "forbidden-flow", "x", HUMAN_DEF)))
@@ -148,14 +154,14 @@ class WorkflowDefinitionCrudTest {
         String id = WorkflowTestSupport.createPublishedWorkflowId(
                 mockMvc, jwtService, objectMapper, "crud-published", HUMAN_DEF);
 
-        mockMvc.perform(put("/api/workflows/{id}", id)
+        mockMvc.perform(put("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"nope\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(40900));
 
-        mockMvc.perform(delete("/api/workflows/{id}", id)
+        mockMvc.perform(delete("/api/approval-workflows/{id}", id)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(40900));
@@ -163,7 +169,7 @@ class WorkflowDefinitionCrudTest {
 
     @Test
     void invalidCodeIsRejected() throws Exception {
-        mockMvc.perform(post("/api/workflows")
+        mockMvc.perform(post("/api/approval-workflows")
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(WorkflowTestSupport.workflowBody(

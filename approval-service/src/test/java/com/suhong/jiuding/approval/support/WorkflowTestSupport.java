@@ -52,7 +52,7 @@ public final class WorkflowTestSupport {
     /** Creates a DRAFT workflow as platform admin and returns the created view. */
     public static MvcResult createWorkflow(MockMvc mockMvc, JwtService jwtService, ObjectMapper mapper,
                                            String code, String definitionJson) throws Exception {
-        return mockMvc.perform(post("/api/workflows")
+        return mockMvc.perform(post("/api/approval-workflows")
                         .header(AUTH, TestSupport.admin(jwtService))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(workflowBody(mapper, code, code, definitionJson)))
@@ -68,7 +68,7 @@ public final class WorkflowTestSupport {
 
     /** Publishes a workflow as platform admin and returns the published view. */
     public static MvcResult publish(MockMvc mockMvc, JwtService jwtService, String id) throws Exception {
-        return mockMvc.perform(post("/api/workflows/{id}/publish", id)
+        return mockMvc.perform(post("/api/approval-workflows/{id}/publish", id)
                         .header(AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -82,7 +82,7 @@ public final class WorkflowTestSupport {
     }
 
     public static MvcResult getWorkflow(MockMvc mockMvc, JwtService jwtService, String id) throws Exception {
-        return mockMvc.perform(get("/api/workflows/{id}", id)
+        return mockMvc.perform(get("/api/approval-workflows/{id}", id)
                         .header(AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
                 .andReturn();

@@ -19,7 +19,7 @@ package com.suhong.jiuding.approval.workflowdef;
 
 import java.util.List;
 
-/** Result of {@code POST /api/workflows/{id}/validate}. */
+/** Result of {@code POST /api/approval-workflows/{id}/validate}. */
 public record WorkflowValidationResult(boolean valid, List<String> errors, List<String> warnings, int nodeCount) {
 
     public static WorkflowValidationResult ok(List<String> warnings, int nodeCount) {

@@ -91,7 +91,7 @@ class WorkflowPublishVersionTest {
                 WorkflowTestSupport.getWorkflow(mockMvc, jwtService, v1), objectMapper);
         assertThat(archived1.path("status").asText()).isEqualTo("ARCHIVED");
 
-        MvcResult list = mockMvc.perform(get("/api/workflows")
+        MvcResult list = mockMvc.perform(get("/api/approval-workflows")
                         .param("code", "version-flow")
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isOk())
@@ -116,7 +116,7 @@ class WorkflowPublishVersionTest {
         assertThat(again.path("status").asText()).isEqualTo("PUBLISHED");
         assertThat(again.path("version").asInt()).isEqualTo(1);
 
-        MvcResult list = mockMvc.perform(get("/api/workflows")
+        MvcResult list = mockMvc.perform(get("/api/approval-workflows")
                         .param("code", "version-idem")
                         .param("status", "PUBLISHED")
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
@@ -149,7 +149,7 @@ class WorkflowPublishVersionTest {
         String v2 = WorkflowTestSupport.createPublishedWorkflowId(
                 mockMvc, jwtService, objectMapper, "version-archived", DEF_V2);
 
-        mockMvc.perform(post("/api/workflows/{id}/publish", v1)
+        mockMvc.perform(post("/api/approval-workflows/{id}/publish", v1)
                         .header(WorkflowTestSupport.AUTH, TestSupport.admin(jwtService)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40001));

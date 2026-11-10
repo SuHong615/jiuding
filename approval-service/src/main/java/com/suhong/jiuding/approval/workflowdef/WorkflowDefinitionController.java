@@ -32,9 +32,15 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-/** Platform-admin workflow definition API (docs/23 §3). */
+/**
+ * Platform-admin workflow definition API (docs/23 §3).
+ *
+ * <p>Primary base path is {@code /api/approval-workflows}; the legacy
+ * {@code /api/workflows} path is kept as a transitional alias so existing clients
+ * (and the frontend during rollout) keep working.
+ */
 @RestController
-@RequestMapping("/api/workflows")
+@RequestMapping({"/api/approval-workflows", "/api/workflows"})
 public class WorkflowDefinitionController {
 
     private final WorkflowDefinitionService service;

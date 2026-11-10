@@ -21,7 +21,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-/** Body of {@code POST /api/workflows}. A new DRAFT version is created per call. */
+/** Body of {@code POST /api/approval-workflows}. A new DRAFT version is created per call. */
 public record WorkflowCreateRequest(
         @NotBlank(message = "code is required") String code,
         String name,

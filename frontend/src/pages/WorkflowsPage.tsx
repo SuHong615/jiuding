@@ -5,6 +5,7 @@ import { Badge } from '../components/Badge'
 import { SectionCard } from '../components/Forms'
 import { Icon } from '../components/Icon'
 import { formatDateTime } from '../utils/format'
+import { WorkflowDefinitionsSection } from './WorkflowDefinitionsSection'
 
 const STATIC_STAGES: WorkflowStageView[] = [
   {
@@ -174,6 +175,8 @@ export function WorkflowsPage() {
           ))}
         </ol>
       </SectionCard>
+
+      <WorkflowDefinitionsSection />
     </div>
   )
 }

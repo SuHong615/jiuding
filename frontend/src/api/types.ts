@@ -213,6 +213,36 @@ export interface WorkflowLifecycleView {
   updatedAt?: string | null
 }
 
+/* ------------------------------ v12：审批流程定义编排（docs/23 §3） ------------------------------ */
+
+export interface ApprovalWorkflowView {
+  id: string
+  code: string
+  name: string
+  version?: number | string | null
+  status?: string | null
+  definitionJson?: string | null
+  definition?: unknown
+  createdBy?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  publishedAt?: string | null
+}
+
+export interface ApprovalWorkflowPayload {
+  code: string
+  name: string
+  definitionJson: string
+}
+
+export interface WorkflowValidateResult {
+  valid?: boolean
+  ok?: boolean
+  errors?: string[]
+  warnings?: string[]
+  message?: string
+}
+
 /** 列表分页：兼容 Spring Page（content/totalElements）与 docs/11 的 {items,total,page,size} */
 export interface PageResult<T> {
   content?: T[]
