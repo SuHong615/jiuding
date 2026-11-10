@@ -41,6 +41,25 @@ services:
       - tenancy-net
     restart: unless-stopped
 
+  redis:
+    # Internal-only cache (no password, not published to the host).
+    image: redis:7-alpine
+    container_name: tenancy-redis
+    command: ["redis-server", "--appendonly", "no", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - tenancy-net
+    restart: unless-stopped
+
   tenant-service:
     build:
       context: ..
@@ -49,6 +68,8 @@ services:
     container_name: tenancy-tenant-service
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      REDIS_URL: redis://redis:6379
+      TENANCY_REDIS_ENABLED: ${TENANCY_REDIS_ENABLED:-true}
       TENANT_DB_URL: jdbc:postgresql://postgres:5432/tenant_db
       TENANT_DB_USER: ${POSTGRES_USER:-tenancy}
       TENANT_DB_PASSWORD: ${POSTGRES_PASSWORD:-tenancy-dev-pass}
@@ -63,6 +84,8 @@ services:
       TZ: Asia/Shanghai
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
@@ -202,6 +225,8 @@ services:
       APPROVAL_SERVICE_URL: http://approval-service:8082
       AGENT_SERVICE_URL: http://agent-service:8083
       MCP_SERVICE_URL: http://mcp-service:8084
+      REDIS_URL: redis://redis:6379
+      TENANCY_REDIS_ENABLED: ${TENANCY_REDIS_ENABLED:-true}
       TENANCY_SECURITY_JWT_SECRET: ${TENANCY_JWT_SECRET:-tenancy-center-dev-secret-change-me-please}
       TENANCY_SECURITY_INTERNAL_TOKEN: ${TENANCY_INTERNAL_TOKEN:-dev-internal-token}
       TENANCY_SECURITY_API_KEYS: ${TENANCY_MCP_API_KEY:-dev-mcp-key}
@@ -216,6 +241,8 @@ services:
       agent-service:
         condition: service_healthy
       mcp-service:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
@@ -254,3 +281,4 @@ networks:
 
 volumes:
   postgres-data:
+  redis-data:

@@ -77,6 +77,13 @@ tenancy:
       - /scim
       - /scim/**
       - /error
+  # v12 optional Redis for distributed login/quota rate limiting (docs/23 §5).
+  # REDIS_URL (redis://[user:password@]host:port/db) or tenancy.redis.enabled=true activates it;
+  # any Redis failure degrades to the in-memory limiters automatically.
+  redis:
+    enabled: ${TENANCY_REDIS_ENABLED:false}
+    url: ${REDIS_URL:}
+    key-prefix: ${TENANCY_REDIS_KEY_PREFIX:tenancy:rl:}
   auth:
     # v12 platform-login fallback switch (docs/23 §5): when false (production default) only
     # the tenant-service platform database is consulted; preset users are ignored.

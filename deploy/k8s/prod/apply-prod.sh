@@ -47,11 +47,17 @@ else
   sh "$BASE/gen-secrets.sh"
 fi
 
-echo "== base manifests (with mcp_db init + MCP_DB_* env) =="
-for f in 00-namespace 02-postgres 03-tenant-service 04-approval-service \
+echo "== base manifests (with mcp_db init + MCP_DB_* env + Redis) =="
+for f in 00-namespace 02-postgres 09-redis 03-tenant-service 04-approval-service \
          05-agent-service 06-mcp-service 07-gateway 08-frontend; do
   $APPLY -f "$BASE/$f.yaml" >/dev/null
 done
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "== redis wait skipped (dry-run) =="
+else
+  kubectl -n tenancy-center wait --for=condition=Available deployment/redis --timeout=120s || true
+fi
 
 echo "== replicas=2 (stateless services) =="
 SCALE_DRY=""

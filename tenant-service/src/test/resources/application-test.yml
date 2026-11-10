@@ -30,6 +30,9 @@ tenancy:
   # PostgreSQL RLS is disabled on H2 (docs/23 section 2); the wrapper is not installed.
   rls:
     enabled: false
+  # Tests use the in-memory permission cache; Redis is exercised with stubs only.
+  redis:
+    enabled: false
   # Deterministically unreachable agent tier: risk review / rating skill degrade to local rules.
   agent-service:
     url: http://127.0.0.1:1

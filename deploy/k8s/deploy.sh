@@ -56,6 +56,8 @@ $KUBECTL apply -f "$HERE/00-namespace.yaml"
 sh "$HERE/gen-secrets.sh"
 $KUBECTL apply -f "$HERE/02-postgres.yaml"
 $KUBECTL wait --for=condition=Available deployment/postgres -n tenancy-center --timeout=180s || true
+$KUBECTL apply -f "$HERE/09-redis.yaml"
+$KUBECTL wait --for=condition=Available deployment/redis -n tenancy-center --timeout=120s || true
 $KUBECTL apply -f "$HERE/03-tenant-service.yaml"
 $KUBECTL apply -f "$HERE/04-approval-service.yaml"
 $KUBECTL apply -f "$HERE/05-agent-service.yaml"
@@ -64,7 +66,7 @@ $KUBECTL apply -f "$HERE/07-gateway.yaml"
 $KUBECTL apply -f "$HERE/08-frontend.yaml"
 
 echo "== waiting for rollout =="
-for d in tenant-service approval-service agent-service mcp-service gateway frontend; do
+for d in tenant-service approval-service agent-service mcp-service gateway frontend redis; do
   $KUBECTL rollout status "deployment/$d" -n tenancy-center --timeout=300s || true
 done
 

@@ -33,6 +33,7 @@
 | mcp-service | `localhost:8084` | 不映射 | `8084` | `GET /actuator/health`、`GET /mcp/info` |
 | frontend | Vite `5173` | `8088` | `80` | `GET /` |
 | PostgreSQL | 不使用 | `5432`（可选暴露） | `5432` | `pg_isready -U tenancy` |
+| Redis | 不使用（可选；`TENANCY_REDIS_ENABLED=false` 时服务降级） | 不映射 | `6379` | `redis-cli ping` |
 
 > **端口纪律**：禁止占用 `3183`（DSH GUI）。启动前用 `Get-NetTCPConnection -LocalPort 8080,8081,8082,8083,8084 -ErrorAction SilentlyContinue` 检查；若被占用，先停掉旧进程（见 §8）。
 
@@ -234,9 +235,9 @@ docker compose -f deploy/docker-compose.yml down -v
 
 ```text
 deploy/
-├── docker-compose.yml        # 7 容器 + bridge 网络 tenancy-net + 2 卷
+├── docker-compose.yml        # 8 容器（含 Redis）+ bridge 网络 tenancy-net + 数据卷
 ├── .env.example              # JWT_SECRET / TENANCY_INTERNAL_TOKEN / TENANCY_SECURITY_API_KEYS / OPENAI_*（可选）
-├── postgres/init/01-databases.sql   # 创建 3 库
+├── postgres/init/01-databases.sql   # 创建 4 库（tenant/approval/agent/mcp）
 ├── tenant-service/Dockerfile
 ├── approval-service/Dockerfile
 ├── agent-service/Dockerfile
@@ -246,9 +247,10 @@ deploy/
 ```
 
 - 每个 Spring 服务 Dockerfile 为**多阶段**：`maven:3.9-eclipse-temurin-17` 构建（`mvn -B -pl <module> -am -DskipTests package`）→ `eclipse-temurin:17-jre` 运行；以非 root 用户运行；`HEALTHCHECK` 调 `/actuator/health`（JRE 镜像内需安装 `curl`，或在 Dockerfile 中显式 `apt-get install -y curl`；健康检查命令必须在镜像内存在）。
-- `depends_on` 使用 `condition: service_healthy`：`postgres` 健康后才起业务服务；`gateway` 依赖四个后端服务健康；`frontend` 依赖 `gateway` 健康。
+- `depends_on` 使用 `condition: service_healthy`：`postgres`、`redis` 健康后才起业务服务；`gateway` 依赖四个后端服务健康；`frontend` 依赖 `gateway` 健康。
 - 网络：单一 `bridge` 网络 `tenancy-net`，服务间用容器名互访（`http://tenant-service:8081`）。
-- 卷：`tenancy-pgdata`（数据库数据）、`tenancy-skills`（技能包只读挂载到 agent-service `/app/skills`）。
+- Redis：`redis:7-alpine` 内部缓存（无密码、不映射宿主端口、healthcheck `redis-cli ping`），`gateway` 与 `tenant-service` 通过 `REDIS_URL=redis://redis:6379`、`TENANCY_REDIS_ENABLED=true` 使用；不可用时可将该开关置 `false` 降级。
+- 卷：`postgres-data`（PostgreSQL 数据）、`redis-data`（Redis 数据）。
 
 **本机限制**：本机没有 Docker Engine，以上命令**不在本机执行**；交付前只做静态检查（§7.3）。
 
@@ -268,6 +270,9 @@ deploy/
 | `TENANCY_INTERNAL_TOKEN` | tenant-service / approval-service / agent-service | `dev-internal-token` | 内部接口 `/internal/**` 校验凭证 |
 | `TENANCY_USERS` | gateway | 内置 4 用户 | JSON 数组覆盖，格式见 `docs/02` §1 |
 | `TENANCY_SKILLS_DIR` | agent-service | `../skills`（本地）/`/app/skills`（docker） | 技能包目录 |
+| `REDIS_URL` | gateway / tenant-service | 空（未配置则缓存关闭） | compose 内 `redis://redis:6379`；k8s 用 `REDIS_HOST`/`REDIS_PORT` |
+| `TENANCY_REDIS_ENABLED` | gateway / tenant-service | `false`（建议显式开启） | 是否启用 Redis 缓存；compose/k8s 置 `true` |
+| `REDIS_HOST` / `REDIS_PORT` | gateway / tenant-service（k8s） | — | k8s 注入 `redis` / `6379`，等价于 `REDIS_URL` |
 | `TENANCY_AGENT_MODEL_PROVIDER` | agent-service | `scripted` | `scripted` 或 `openai` |
 | `OPENAI_BASE_URL` | agent-service（可选） | 空 | provider=openai 时必填，OpenAI 兼容端点 |
 | `OPENAI_API_KEY` | agent-service（可选） | 空 | provider=openai 时必填 |
@@ -401,6 +406,7 @@ Select-String -Path D:\deepseekHarness\tenancy-center\deploy\**\Dockerfile -Patt
 |---|---|
 | `deploy/docker-compose.local.yml` | 本机覆盖：gateway 发布 `18080`（8080 被 opencode 占用）、JVM 堆上限、PG `shared_buffers` 调小 |
 | `deploy/k8s/00-08*.yaml` | namespace/secret/PG(PVC)/5 服务/frontend 全量清单；所有服务 NodePort 暴露便于本地验证 |
+| `deploy/k8s/09-redis.yaml` | Redis 7 Deployment + ClusterIP Service（6379，limits，`redis-cli ping` readiness）；gateway/tenant 注入 `REDIS_HOST`/`REDIS_PORT` |
 | `deploy/k8s/deploy.sh` | 将 docker 镜像 `save \| k3s ctr images import` 后 apply 并等待 rollout（无需镜像仓库） |
 | `deploy/k8s/publish.sh` | 用 socat 容器把 NodePort 发布到 docker 网桥，使 **Windows 可经 localhost 访问**（WSL 原始监听不会被自动转发） |
 | `deploy/k8s/portforward.sh` | `kubectl port-forward --address 0.0.0.0` 备选方案（仅 WSL 内可用） |
@@ -417,6 +423,8 @@ Select-String -Path D:\deepseekHarness\tenancy-center\deploy\**\Dockerfile -Patt
 | agent-service | 8083 | 30083 | `http://localhost:30083` |
 | mcp-service | 8084 | 30084 | `http://localhost:30084` |
 | frontend | 80 | 30088 | `http://localhost:30088` |
+
+> Redis 不暴露 NodePort：Service `redis` 为 ClusterIP `6379`，仅 gateway/tenant-service 集群内访问；本地无 Redis 时可设 `TENANCY_REDIS_ENABLED=false` 降级。
 
 ### 9.4 k8s 实测结果
 

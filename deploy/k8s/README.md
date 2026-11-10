@@ -21,10 +21,19 @@
 | Namespace `tenancy-center` | 隔离整个平台 |
 | Secret `tenancy-secrets` | PG 凭据、JWT secret、内部 token、MCP API Key |
 | PVC `postgres-data`（2Gi） | Postgres 数据（k3s 默认 local-path） |
-| Deployment/Service `postgres` | PostgreSQL 16，init 创建 tenant_db/approval_db/agent_db |
+| Deployment/Service `postgres` | PostgreSQL 16，init 创建 tenant_db/approval_db/agent_db/mcp_db |
 | Deployments | tenant 8081、approval 8082、agent 8083、mcp 8084、gateway 8080、frontend 80 |
-| Services | 全部 NodePort，见下表 |
+| Deployment/Service `redis` | Redis 7（`09-redis.yaml`）内部缓存，ClusterIP:6379，不对外暴露 |
+| Services | 业务服务 NodePort（见下表）；Redis 仅 ClusterIP |
 | 镜像 | 由 docker 构建后 `docker save \| k3s ctr images import -` 导入，无需镜像仓库 |
+
+## Redis 缓存（v9）
+
+- `09-redis.yaml`：Deployment + ClusterIP Service，镜像 `redis:7-alpine`，`--maxmemory 256mb --maxmemory-policy allkeys-lru`，`emptyDir` 数据目录；
+- 资源：requests `50m/64Mi`、limits `500m/256Mi`；readiness/liveness 均为 `redis-cli ping`；
+- gateway / tenant-service 注入 `REDIS_HOST=redis`、`REDIS_PORT=6379`、`TENANCY_REDIS_ENABLED=true`（compose 对应 `REDIS_URL=redis://redis:6379`）；
+- 无密码，仅集群内网可达；生产建议使用托管 Redis / 哨兵并启用密码与 NetworkPolicy；
+- 未部署 Redis 的环境可将 `TENANCY_REDIS_ENABLED` 置为 `false`（需服务支持降级）。
 
 ## NodePort / 访问矩阵
 
@@ -36,6 +45,8 @@
 | agent-service | 30083 | `http://localhost:30083` |
 | mcp-service | 30084 | `http://localhost:30084` |
 | frontend | 30088 | `http://localhost:30088` |
+
+> Redis 为 ClusterIP `redis:6379`，不发布 NodePort；仅 gateway/tenant-service 在集群内访问。
 
 > **为什么需要发布脚本**：本机 WSL2 只把 **docker publish 的端口**自动转发到 Windows；k8s NodePort / kubectl port-forward 是 WSL 内原始监听，Windows `localhost` 访问不到。`publish.sh` 用 `alpine/socat` 容器把 NodePort 发布到 docker 网桥（容器发布端口 → Windows 可见），从而 `localhost:300xx` 可达。
 
@@ -130,7 +141,8 @@ sh deploy/k8s/restore.sh --from <dir> --db tenant_db,mcp_db --yes
 
 ## 说明与限制
 
-- 面向**本地单节点验证**：单副本、local-path 存储、`IfNotPresent` + 本地导入镜像，无 HPA/PDB/NetworkPolicy。
+- 面向**本地单节点验证**：单副本、local-path 存储、`IfNotPresent` + 本地导入镜像，无 HPA/PDB/NetworkPolicy（生产化 overlay 见 `prod/`）。
+- Redis 为**内网缓存**（ClusterIP、无密码、无持久化保证）；生产建议托管 Redis/哨兵 + 密码 + NetworkPolicy，或关闭 `TENANCY_REDIS_ENABLED` 走无缓存降级。
 - 生产化建议：外部镜像仓库、Secret 管理（SealedSecrets/External Secrets）、多副本 + 反亲和、Ingress + TLS、ResourceQuota/NetworkPolicy、Postgres 外部化。
 - 内存预算：namespace 实测约 2.4 GiB（JVM `MaxRAMPercentage=45`、PG `shared_buffers=128MB`），可与本机其它容器共存。
 - `portforward.sh` 为 WSL 内备选（Windows 无法直连 WSL 原始监听）。

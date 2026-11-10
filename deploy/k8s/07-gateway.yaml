@@ -41,6 +41,12 @@ spec:
               value: http://agent-service:8083
             - name: MCP_SERVICE_URL
               value: http://mcp-service:8084
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: TENANCY_REDIS_ENABLED
+              value: "true"
             - name: TENANCY_SECURITY_JWT_SECRET
               valueFrom: { secretKeyRef: { name: tenancy-secrets, key: TENANCY_SECURITY_JWT_SECRET } }
             - name: TENANCY_SECURITY_INTERNAL_TOKEN

@@ -38,6 +38,8 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 | `TENANCY_MOCK_OIDC_ISSUER` | 空 | Mock OIDC issuer 覆盖（空则按请求 Host 自动推导 `/mock-oidc`） |
 | `TENANCY_MOCK_OIDC_USERNAME` / `TENANCY_MOCK_OIDC_DISPLAY_NAME` / `TENANCY_MOCK_OIDC_ROLES` | `mock-user` / `Mock User` / `TENANT_ADMIN` | Mock userinfo 返回的 sub/name/roles |
 | `TENANCY_MOCK_OIDC_CODE_TTL_SECONDS` / `TENANCY_MOCK_OIDC_TOKEN_TTL_SECONDS` | `120` / `300` | Mock authorization code / access token TTL |
+| `TENANCY_REDIS_ENABLED` / `REDIS_URL` | `false` / 空 | v12 分布式限流 Redis 开关与连接串（`redis://[user:password@]host:port/db`；设置 REDIS_URL 即视为启用） |
+| `TENANCY_REDIS_KEY_PREFIX` | `tenancy:rl:` | Redis 限流 key 前缀 |
 | `TENANT_SERVICE_URL` | `http://localhost:8081` | 租户服务 |
 | `APPROVAL_SERVICE_URL` | `http://localhost:8082` | 审批服务 |
 | `AGENT_SERVICE_URL` | `http://localhost:8083` | Agent/Skill 服务 |
@@ -106,6 +108,15 @@ java -jar gateway\target\gateway-0.9.0-SNAPSHOT.jar
 - `GET /api/auth/oidc/providers` 返回 `[{code,name,loginUrl}]`（不含 secret）；`authorize?provider=<code>` 选择 Provider，
   provider code 绑定进签名 state，callback 使用对应 issuer/client/secret/frontendRedirect；未知 provider → 404；多个 Provider
   未指定 code → 400/404 明确提示。未启用任何 Provider 时保持 v6 disabled 行为。
+
+## Redis 分布式限流（v12，docs/23 §5）
+
+- 新增 `spring-boot-starter-data-redis`；`tenancy.redis.enabled=true` 或设置 `REDIS_URL` 时，登录限流与租户 API RPM 使用 Redis，
+  否则沿用内存实现；Redis 连接失败/命令异常时按请求自动降级为内存计数（WARN 日志），不返回 5xx。
+- 登录限流：ZSET 滑动窗口，key `tenancy:rl:login:<clientIp>:<username>`，窗口/阈值同 `tenancy.auth.login-rate-limit.*`（默认 60s/10 次）。
+- 租户 RPM：key `tenancy:rl:quota:<tenantId>`，窗口同 `tenancy.gateway.tenant-quota.window-seconds`（默认 60s）。
+- 每次请求清理窗口外成员、`ZCARD` 判阈值、通过后 `ZADD` + `PEXPIRE`（窗口 TTL）；多副本共享计数。
+- `GatewayApplication` 已排除 Spring Boot 默认 Redis auto-configuration，Redis 仅按需创建，不影响未启用时的启动/健康检查。
 
 ## Mock OIDC（v12，dev-only，docs/23 §4）
 

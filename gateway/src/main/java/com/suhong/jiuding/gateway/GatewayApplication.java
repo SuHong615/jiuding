@@ -18,6 +18,8 @@
 package com.suhong.jiuding.gateway;
 
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
@@ -32,7 +34,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  *   <li>aggregate {@code /api/platform/**} snapshots with per-service degradation.</li>
  * </ul>
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = {RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class})
 @ConfigurationPropertiesScan("com.suhong.jiuding.gateway")
 public class GatewayApplication {
 

@@ -1,6 +1,6 @@
 # 部署指南（Docker Compose）
 
-`deploy/` 提供多租户中心的**一键容器化部署**：PostgreSQL 16 + 5 个 Spring Boot 服务 + 前端 nginx。
+`deploy/` 提供多租户中心的**一键容器化部署**：PostgreSQL 16 + Redis 7 + 5 个 Spring Boot 服务 + 前端 nginx。
 本仓库开发机没有 Docker Engine，因此该目录以「静态正确」交付：YAML/路径/健康检查均可在目标机器直接使用；
 本地无 Docker 时的进程级验证请用 `scripts/run-local.ps1` + `scripts/verify.ps1`。
 
@@ -44,7 +44,8 @@ docker compose down -v
 | approval-service | 8082 | 不发布 | 审批工作流 |
 | agent-service | 8083 | 不发布 | Agent + Skill 规则引擎 |
 | mcp-service | 8084 | 不发布 | MCP JSON-RPC |
-| postgres | 5432 | 不发布 | 三库：tenant_db / approval_db / agent_db |
+| postgres | 5432 | 不发布 | 四库：tenant_db / approval_db / agent_db / mcp_db |
+| redis | 6379 | 不发布 | 内部缓存（无密码，healthcheck = `redis-cli ping`） |
 
 访问：前端 <http://localhost:8088>，API <http://localhost:8080>。
 

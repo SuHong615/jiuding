@@ -1,29 +1,43 @@
+/*
+ * Copyright 2026 suhong
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * @author suhong
+ */
 package com.suhong.jiuding.gateway.quota;
 
 import com.suhong.jiuding.gateway.config.TenantQuotaProperties;
+import com.suhong.jiuding.gateway.ratelimit.RateLimitStore;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
- * In-memory sliding-window request counter per tenant id (docs/17 §5).
- * Window length {@code tenancy.gateway.tenant-quota.window-seconds} (60s by default).
+ * Sliding-window request counter per tenant id (docs/17 §5, docs/23 §5).
+ *
+ * <p>Key = {@code quota:<tenantId>}; window length
+ * {@code tenancy.gateway.tenant-quota.window-seconds} (60s by default). Counting is delegated
+ * to the {@link RateLimitStore} (Redis when configured, in-memory otherwise, with automatic
+ * fallback on Redis failure).
  */
 @Component
 public class TenantQuotaLimiter {
 
-    private static final int PURGE_EVERY_CALLS = 1024;
-
     private final TenantQuotaProperties properties;
-    private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
-    private long calls;
+    private final RateLimitStore store;
 
-    public TenantQuotaLimiter(TenantQuotaProperties properties) {
+    public TenantQuotaLimiter(TenantQuotaProperties properties, RateLimitStore store) {
         this.properties = properties;
+        this.store = store;
     }
 
     /**
@@ -32,47 +46,13 @@ public class TenantQuotaLimiter {
      * @param limit positive API RPM limit
      * @return {@code false} when the sliding window is already full
      */
-    public synchronized boolean tryAcquire(String tenantId, long limit) {
+    public boolean tryAcquire(String tenantId, long limit) {
         long windowMs = Math.max(1L, properties.getWindowSeconds()) * 1000L;
-        long now = System.currentTimeMillis();
-        Window window = windows.computeIfAbsent(tenantId, ignored -> new Window());
-        purgeOlderThan(window, now - windowMs);
-        boolean allowed = window.timestamps.size() < limit;
-        if (allowed) {
-            window.timestamps.addLast(now);
-        }
-        window.lastSeen = now;
-        if ((++calls % PURGE_EVERY_CALLS) == 0) {
-            purgeStaleWindows(now - windowMs * 2);
-        }
-        return allowed;
+        return store.tryAcquire("quota:" + tenantId, limit, windowMs);
     }
 
     /** Visible for tests. */
-    public synchronized void reset() {
-        windows.clear();
-        calls = 0;
-    }
-
-    private static void purgeOlderThan(Window window, long cutoff) {
-        while (!window.timestamps.isEmpty() && window.timestamps.peekFirst() <= cutoff) {
-            window.timestamps.pollFirst();
-        }
-    }
-
-    private void purgeStaleWindows(long cutoff) {
-        Iterator<Map.Entry<String, Window>> iterator = windows.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Window window = iterator.next().getValue();
-            purgeOlderThan(window, cutoff);
-            if (window.timestamps.isEmpty() && window.lastSeen <= cutoff) {
-                iterator.remove();
-            }
-        }
-    }
-
-    private static final class Window {
-        private final Deque<Long> timestamps = new ArrayDeque<>();
-        private long lastSeen;
+    public void reset() {
+        store.reset();
     }
 }

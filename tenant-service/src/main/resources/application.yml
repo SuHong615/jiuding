@@ -25,6 +25,13 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  # Optional shared Redis for the permission cache (docs/23 section 5). Disabled by default;
+  # the cache degrades to memory when the server is unreachable.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: ${REDIS_TIMEOUT:2s}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -65,6 +72,9 @@ tenancy:
   # PostgreSQL row level security (docs/23 section 2). H2/dev/test keeps it disabled.
   rls:
     enabled: ${TENANCY_RLS_ENABLED:false}
+  # Shared permission cache (docs/23 section 5); falls back to memory when unavailable.
+  redis:
+    enabled: ${TENANCY_REDIS_ENABLED:false}
   # Skill-driven risk review executed through agent-service before approval creation.
   risk-review:
     enabled: ${TENANCY_RISK_REVIEW_ENABLED:true}
